@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nikkel API Debug</title>
+<style>
+  body { font-family: monospace; padding: 20px; background: #111; color: #e0e0e0; max-width: 900px; margin: 0 auto; }
+  h1 { color: #4fc3f7; }
+  h2 { color: #81c784; margin-top: 24px; }
+  button { font-family: monospace; padding: 8px 16px; margin: 4px; cursor: pointer; background: #333; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; }
+  button:hover { background: #444; }
+  pre { background: #1a1a2e; padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; font-size: 13px; }
+  .success { color: #81c784; }
+  .error { color: #e57373; }
+  .step { border-left: 3px solid #555; padding: 8px 16px; margin: 8px 0; background: #1a1a1a; }
+  .step.done { border-left-color: #81c784; }
+  .step.fail { border-left-color: #e57373; }
+  input { font-family: monospace; padding: 6px 10px; margin: 4px; background: #222; color: #e0e0e0; border: 1px solid #444; border-radius: 3px; width: 250px; }
+  label { display: inline-block; width: 100px; }
+  .flex { display: flex; gap: 16px; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 280px; }
+  .section { background: #1a1a1a; border: 1px solid #333; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<h1>Nikkel API Debug</h1>
+<p>API: <span id="apiUrl">http://localhost:3001</span></p>
+
+<div class="flex">
+  <div class="col">
+    <div class="section">
+      <h2>1. Registration</h2>
+      <label>Email:</label><input id="regEmail" value="test-{{RAND}}@example.com"><br>
+      <label>Password:</label><input id="regPass" value="password123" type="password"><br>
+      <label>Name:</label><input id="regName" value="Test User"><br>
+      <label>Org:</label><input id="regOrg" value="Debug Org"><br>
+      <button onclick="register()">Register</button>
+      <pre id="regResult"></pre>
+    </div>
+
+    <div class="section">
+      <h2>2. Login</h2>
+      <label>Email:</label><input id="loginEmail" value="test@example.com"><br>
+      <label>Password:</label><input id="loginPass" value="password123" type="password"><br>
+      <button onclick="login()">Login</button>
+      <pre id="loginResult"></pre>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="section">
+      <h2>3. Create Project</h2>
+      <label>Name:</label><input id="projName" value="My Test Project"><br>
+      <label>URL:</label><input id="projUrl" value="https://example.com"><br>
+      <button onclick="createProject()">Create Project</button>
+      <pre id="projResult"></pre>
+    </div>
+
+    <div class="section">
+      <h2>4. List Projects</h2>
+      <button onclick="listProjects()">List Projects</button>
+      <pre id="listProjResult"></pre>
+    </div>
+
+    <div class="section">
+      <h2>5. Full Flow Test</h2>
+      <button onclick="fullFlow()">Run Full Flow</button>
+      <div id="fullFlowSteps"></div>
+      <pre id="fullFlowResult"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Token</h2>
+  <pre id="tokenDisplay">(none)</pre>
+  <button onclick="clearToken()">Clear Token</button>
+</div>
+
+<script>
+let API = 'http://localhost:3002'
+let TOKEN = localStorage.getItem('debug_token') || ''
+
+function display(id, data, isError) {
+  const el = document.getElementById(id)
+  el.className = isError ? 'error' : 'success'
+  el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
+}
+
+function updateTokenDisplay() {
+  document.getElementById('tokenDisplay').textContent = TOKEN || '(none)'
+}
+
+function clearToken() {
+  TOKEN = ''
+  localStorage.removeItem('debug_token')
+  updateTokenDisplay()
+}
+
+async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN
+  const res = await fetch(API + path, { ...options, headers })
+  const text = await res.text()
+  let data
+  try { data = JSON.parse(text) } catch { data = text }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}: ${text}`)
+  return data
+}
+
+async function register() {
+  const email = document.getElementById('regEmail').value.replace('{{RAND}}', Math.random().toString(36).slice(2, 8))
+  const password = document.getElementById('regPass').value
+  const fullName = document.getElementById('regName').value
+  const orgName = document.getElementById('regOrg').value
+  try {
+    const data = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, fullName, orgName })
+    })
+    TOKEN = data.token
+    localStorage.setItem('debug_token', TOKEN)
+    updateTokenDisplay()
+    display('regResult', { email, ...data })
+  } catch (e) {
+    display('regResult', e.message, true)
+  }
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value
+  const password = document.getElementById('loginPass').value
+  try {
+    const data = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    })
+    TOKEN = data.token
+    localStorage.setItem('debug_token', TOKEN)
+    updateTokenDisplay()
+    display('loginResult', data)
+  } catch (e) {
+    display('loginResult', e.message, true)
+  }
+}
+
+async function createProject() {
+  const name = document.getElementById('projName').value
+  const url = document.getElementById('projUrl').value
+  try {
+    const data = await api('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name, url })
+    })
+    display('projResult', data)
+  } catch (e) {
+    display('projResult', e.message, true)
+  }
+}
+
+async function listProjects() {
+  try {
+    const data = await api('/projects')
+    display('listProjResult', data)
+  } catch (e) {
+    display('listProjResult', e.message, true)
+  }
+}
+
+async function fullFlow() {
+  const steps = document.getElementById('fullFlowSteps')
+  const result = document.getElementById('fullFlowResult')
+  steps.innerHTML = ''
+  result.textContent = ''
+
+  function addStep(label, ok, detail) {
+    const div = document.createElement('div')
+    div.className = 'step ' + (ok ? 'done' : 'fail')
+    div.textContent = (ok ? '✓ ' : '✗ ') + label + (detail ? ': ' + detail : '')
+    steps.appendChild(div)
+  }
+
+  const rand = Math.random().toString(36).slice(2, 8)
+  const email = `debug-${rand}@example.com`
+  const password = 'test123'
+  const fullName = 'Debug User'
+  const orgName = 'Debug Org ' + rand
+
+  try {
+    // 1. Register
+    const reg = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, fullName, orgName })
+    })
+    TOKEN = reg.token
+    localStorage.setItem('debug_token', TOKEN)
+    updateTokenDisplay()
+    addStep(true, 'Register', `${email} → token: ${reg.token.slice(0, 20)}...`)
+  } catch (e) {
+    addStep(false, 'Register', e.message)
+  }
+
+  // 2. GET /me
+  try {
+    const me = await api('/auth/me')
+    addStep(true, 'GET /me', `user: ${me.user?.email}`)
+  } catch (e) {
+    addStep(false, 'GET /me', e.message)
+  }
+
+  // 3. Create project
+  let project
+  try {
+    project = await api('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Debug Project', url: 'https://example.com' })
+    })
+    addStep(true, 'Create Project', `${project.name} (${project.id.slice(0, 8)}...)`)
+  } catch (e) {
+    addStep(false, 'Create Project', e.message)
+  }
+
+  // 4. List projects
+  try {
+    const projects = await api('/projects')
+    addStep(true, 'List Projects', `${projects.length} project(s)`)
+  } catch (e) {
+    addStep(false, 'List Projects', e.message)
+  }
+
+  // 5. Create nikkel
+  if (project) {
+    try {
+      const nikkel = await api(`/projects/${project.id}/nikkels`, {
+        method: 'POST',
+        body: JSON.stringify({
+          pageUrl: 'https://example.com',
+          selector: '#main',
+          coordX: 100,
+          coordY: 200,
+          elementTag: 'div',
+          elementText: 'Example text',
+          commentText: 'Debug comment from test flow'
+        })
+      })
+      addStep(true, 'Create Nikkel', `id: ${nikkel.id.slice(0, 8)}..., status: ${nikkel.status}`)
+    } catch (e) {
+      addStep(false, 'Create Nikkel', e.message)
+    }
+  }
+
+  // 6. GET /me again (verify token still works)
+  try {
+    const me2 = await api('/auth/me')
+    addStep(true, 'GET /me (after ops)', `user: ${me2.user?.email}`)
+  } catch (e) {
+    addStep(false, 'GET /me (after ops)', e.message)
+  }
+
+  result.textContent = 'Full flow complete.'
+}
+
+updateTokenDisplay()
+</script>
+</body>
+</html>
