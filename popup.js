@@ -31,7 +31,21 @@ async function getActiveTab() {
 }
 
 async function init() {
-  let state = await bg({ type: 'GET_STATE' });
+  const tab = await getActiveTab();
+  const tabId = tab?.id;
+  let state = await bg({ type: 'GET_STATE', payload: { tabId } });
+
+  // Refresh page context from the actual tab
+  if (tabId) {
+    try {
+      const ctx = await chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_CONTEXT' });
+      if (ctx?.ok) {
+        state.url = ctx.url;
+        state.title = ctx.title;
+      }
+    } catch {}
+  }
+
   console.log('[Popup] GET_STATE', state);
 
   $('toggleBtn').className = state.globalDisabled ? 'off' : '';
@@ -43,9 +57,8 @@ async function init() {
   }
 
   if (state.project) {
-    const tab = await getActiveTab();
-    if (tab) {
-      await bg({ type: 'ACTIVATE_TAB', payload: { tabId: tab.id } });
+    if (tabId) {
+      await bg({ type: 'ACTIVATE_TAB', payload: { tabId } });
     }
     showActiveView(state);
   } else {
@@ -54,9 +67,10 @@ async function init() {
 }
 
 $('toggleBtn').addEventListener('click', async () => {
-  const state = await bg({ type: 'GET_STATE' });
   const tab = await getActiveTab();
-  const res = await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: !state.globalDisabled, tabId: tab?.id } });
+  const tabId = tab?.id;
+  const state = await bg({ type: 'GET_STATE', payload: { tabId } });
+  const res = await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: !state.globalDisabled, tabId } });
   if (res.ok) init();
 });
 
@@ -74,8 +88,8 @@ function showWelcomeView(state) {
 function showActiveView(state) {
   showView('vActive');
   const p = state.project;
-  $('activeProjectName').textContent = p.title || 'Untitled Review';
-  $('activeProjectUrl').textContent = p.base_url || '';
+  $('activeProjectName').textContent = state.title || p.title || 'Untitled Review';
+  $('activeProjectUrl').textContent = state.url || p.base_url || '';
 
   const shareSection = $('shareSection');
   if (!state.isAnonymous && state.user) {
@@ -111,7 +125,7 @@ function showActiveView(state) {
         ga.textContent = 'Connecting…';
         const res = await bg({ type: 'SIGN_IN_GOOGLE' });
         if (res.ok) {
-          showActiveView({ project: state.project, user: res.user, isAnonymous: false });
+          showActiveView({ project: state.project, user: res.user, isAnonymous: false, url: state.url, title: state.title });
         } else {
           showError(res.error || 'Google sign-in failed.');
           ga.disabled = false;
@@ -138,14 +152,15 @@ $('stopReviewBtn').addEventListener('click', async () => {
   clearError();
   const tab = await getActiveTab();
   await bg({ type: 'STOP_REVIEW', payload: { tabId: tab?.id } });
-  showWelcomeView({ user: (await bg({ type: 'GET_STATE' })).user });
+  showWelcomeView({ user: (await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } })).user });
 });
 
 $('shareBtn').addEventListener('click', async () => {
   clearError();
-  const state = await bg({ type: 'GET_STATE' });
+  const tab = await getActiveTab();
+  const tabId = tab?.id;
+  const state = await bg({ type: 'GET_STATE', payload: { tabId } });
   if (state.isAnonymous) {
-    const tab = await getActiveTab();
     const ga = $('googleAuthBtn');
     if (ga) {
       ga.disabled = true;
@@ -153,7 +168,7 @@ $('shareBtn').addEventListener('click', async () => {
     }
     const res = await bg({ type: 'SIGN_IN_GOOGLE' });
     if (res.ok) {
-      showActiveView({ project: state.project, user: res.user, isAnonymous: false });
+      showActiveView({ project: state.project, user: res.user, isAnonymous: false, url: state.url, title: state.title });
     } else {
       showError(res.error || 'Google sign-in failed.');
     }

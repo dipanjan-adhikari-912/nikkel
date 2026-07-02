@@ -18,12 +18,19 @@
 - **Google OAuth** via `chrome.identity.launchWebAuthFlow` → Supabase `/auth/v1/authorize?provider=google`. Redirect URL must be `https://{EXTENSION_ID}.chromiumapp.org/`
 - **Supabase REST API** (not SDK) — all fetches go through `api.js` -> `supabaseFetch()`. Uses `fetch` directly, not `@supabase/supabase-js`
 - **Token refresh** — `supabaseFetch()` auto-refreshes JWT on 401 via `/auth/v1/token?grant_type=refresh_token`
+- **Per-tab state** — background has `globalState` (auth) + `tabState` Map keyed by `tabId`. Each tab has its own `mode`, `project`, `pins`, `url`, `title`. No per-tab info is shared globally.
+- **Only one annotating tab at a time** — entering annotate mode on a tab exits annotate on all other tabs via `MODE_CHANGED` handler
+- **Pins filtered by projectId + pageUrl** — `getProjectNikkels()` now takes a `pageUrl` param. Supabase query includes `&page_url=eq.${url}`, so only page-specific pins are returned.
 - **Background is single source of truth** — all state lives in `background.js`. Content and popup are stateless, communicate via `chrome.runtime.sendMessage`
+- **`tabs.onActivated`** — updates tab state URL/title, sends ACTIVATE if tab has a project
+- **`tabs.onUpdated`** — refreshes URL in tab state on navigation
+- **`tabs.onRemoved`** — cleans up tab state on tab close
+- **`GET_PAGE_CONTEXT`** — content script responds with fresh `{ url, title }` on demand
+- **Popup always queries active tab** — `init()` sends `GET_STATE` with `tabId` and fetches fresh page context from the content script
 - **Shadow DOM** for injected UI — `#nikkel-bar-host`, `#nikkel-comment-host`, `#nikkel-popover-host`. Pins container (`#nikkel-pins`) is a plain `position: absolute` div on `<html>` (not shadow DOM) so pins scroll with the page
 - **Page-relative pin coords** — `pageX = clientX + scrollX`, `pageY = clientY + scrollY`, rendered at `left: (pageX - 13)px; top: (pageY - 13)px`
 - **No auto-reinjection** — `MutationObserver` was removed. Bar is only injected by user action. SPA navigation guard polls `location.href` and calls `removeBar()` on route changes
-- **No `chrome.tabs.onUpdated`** — old `nikkel.app/s/` URL watcher was removed
-- **Global toggle** — popup has a ⏻ power button that disables/enables the whole extension. When disabled, the project is cleared and no tabs are activated.
+- **Global toggle** — popup has a ⏻ power button that disables/enables the whole extension. When disabled, all tab state is cleared and no tabs are activated.
 
 ## Key constraints
 
@@ -36,18 +43,20 @@
 ### Popup → Background
 | type | payload | description |
 |------|---------|-------------|
-| `GET_STATE` | — | Returns `{ user, project, mode, isAnonymous }` |
+| `GET_STATE` | `{ tabId }` | Returns `{ user, project, mode, isAnonymous, url, title }` for that tab |
 | `START_REVIEW` | `{ tabId, title, url }` | Anon sign-in (if needed), create project, send ACTIVATE to tab |
-| `STOP_REVIEW` | `{ tabId }` | Clear state, send DEACTIVATE to tab |
+| `STOP_REVIEW` | `{ tabId }` | Clear tab state, send DEACTIVATE to tab |
 | `SIGN_IN_GOOGLE` | — | OAuth via `chrome.identity.launchWebAuthFlow` |
-| `SIGN_OUT` | — | Clear all state |
+| `SIGN_OUT` | — | Clear all state across all tabs |
+| `TOGGLE_DISABLED` | `{ disabled, tabId }` | Enable/disable extension globally |
 
 ### Content → Background
 | type | payload | description |
 |------|---------|-------------|
-| `SUBMIT_NIKKEL` | `{ nikkel }` | nikkel = `{ pageX, pageY, pageUrl, viewportW, viewportH, tag, selector, elementText, comment }` |
-| `MODE_CHANGED` | `{ mode }` | Persist mode change |
+| `SUBMIT_NIKKEL` | `{ nikkel }` | nikkel = `{ pageX, pageY, pageUrl, viewportW, viewportH, tag, selector, elementText, comment, idx }` |
+| `MODE_CHANGED` | `{ mode }` | Persist mode change per tab (entering annotate exits all other tabs) |
 | `SIGN_IN_GOOGLE` | — | Same as popup |
+| `GET_PAGE_CONTEXT` | — | Returns `{ url, title }` from the page |
 
 ### Background → Content
 | type | payload | description |

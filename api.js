@@ -129,8 +129,10 @@ export async function submitNikkel(data, token) {
   };
 }
 
-export async function getProjectNikkels(projectId, token) {
-  const rows = await supabaseFetch(`/rest/v1/nikkels?project_id=eq.${projectId}&order=idx.asc`, { token });
+export async function getProjectNikkels(projectId, pageUrl, token) {
+  let path = `/rest/v1/nikkels?project_id=eq.${projectId}&order=idx.asc`;
+  if (pageUrl) path += `&page_url=eq.${encodeURIComponent(pageUrl)}`;
+  const rows = await supabaseFetch(path, { token });
   return (rows || []).map(r => ({
     id: r.id,
     projectId: r.project_id,

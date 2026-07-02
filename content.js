@@ -733,6 +733,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         addPin(msg.payload.nikkel);
         return { ok: true };
       }
+      case 'GET_PAGE_CONTEXT': {
+        return { ok: true, url: location.href, title: document.title };
+      }
       case 'LOAD_SESSION': {
         injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate');
         removeAllPins();
