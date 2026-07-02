@@ -19,7 +19,7 @@ function getTabState(tabId) {
   return tabState.get(tabId);
 }
 
-let pendingShare = null; // { tabId, projectId }
+let pendingShare = null; // { tabId, projectId, shareToken }
 
 async function saveState() {
   const tabObj = {};
@@ -180,7 +180,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }, globalState.token);
         tab.nikkels.push(saved);
         await saveState();
-        try { await chrome.tabs.sendMessage(srcTabId, { type: 'PIN_CONFIRMED', payload: { nikkel: saved } }); } catch {}
+        await sendToTab(srcTabId, { type: 'PIN_CONFIRMED', payload: { nikkel: saved } });
         return { ok: true };
       }
 
@@ -189,7 +189,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: true, nikkels: [] };
         const tab = getTabState(srcTabId);
         if (!tab.project) return { ok: true, nikkels: [] };
-        const nikkels = await api.getProjectNikkels(tab.project.id, tab.url, globalState.token);
+        const pageUrl = msg.payload?.pageUrl || tab.url;
+        const nikkels = await api.getProjectNikkels(tab.project.id, pageUrl, globalState.token);
         tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
@@ -217,8 +218,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         globalState.isAnonymous = false;
         if (pendingShare && pendingShare.tabId) {
           const ts = getTabState(pendingShare.tabId);
-          if (ts.project) {
-            const shareUrl = `https://nikkel.app/s/${ts.project.id}`;
+          if (ts.project && ts.project.share_token) {
+            const shareUrl = `https://nikkel.app/board/${ts.project.share_token}`;
             pendingShare = null;
             await saveState();
             return { ok: true, user: globalState.user, shareUrl };
@@ -289,6 +290,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         tabState.clear();
         await saveState();
         return { ok: true };
+      }
+
+      case 'SHARE': {
+        const srcTabId = sender.tab?.id || tabId;
+        if (!srcTabId) return { ok: false, error: 'No tab context' };
+        const tab = getTabState(srcTabId);
+        if (!tab.project) return { ok: false, error: 'No active project' };
+        if (globalState.isAnonymous) {
+          pendingShare = { tabId: srcTabId, projectId: tab.project.id, shareToken: tab.project.share_token };
+          await saveState();
+          return { ok: true, needsAuth: true };
+        }
+        // User is authenticated, return share URL directly
+        const shareUrl = `https://nikkel.app/board/${tab.project.share_token}`;
+        return { ok: true, shareUrl };
       }
 
       default:

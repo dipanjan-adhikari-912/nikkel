@@ -114,6 +114,7 @@ export async function submitNikkel(data, token) {
     body: JSON.stringify(data),
   });
   const row = Array.isArray(result) ? result[0] : result;
+  if (!row) throw new Error('Empty response from Supabase insert');
   return {
     id: row.id,
     projectId: row.project_id,

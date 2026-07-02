@@ -6,6 +6,7 @@ create table if not exists projects (
   owner_id uuid not null default auth.uid() references auth.users on delete cascade,
   title text,
   base_url text,
+  share_token text unique default encode(gen_random_bytes(16), 'hex'),
   created_at timestamptz not null default now()
 );
 

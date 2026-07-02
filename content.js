@@ -228,7 +228,7 @@ function startPolling() {
   stopPolling();
   if (!currentSessionId) return;
   pollInterval = setInterval(() => {
-    bgMsg({ type: 'GET_NIKKELS', payload: { sessionId: currentSessionId } }, (res) => {
+    bgMsg({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (res) => {
       if (res?.ok && res.nikkels) {
         res.nikkels.forEach((n) => {
           if (!pins.find((p) => p.id === n.id)) addPin(n);
@@ -317,7 +317,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode) {
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
       if (!currentSessionId) return;
-      bgMsg({ type: 'GET_NIKKELS', payload: { sessionId: currentSessionId } }, (res) => {
+      bgMsg({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (res) => {
         if (res?.ok && res.nikkels) {
           removeAllPins();
           res.nikkels.forEach((n) => addPin(n));
@@ -428,12 +428,15 @@ function injectCommentBubble(pageX, pageY, elementInfo) {
 
   if (cbEl) cbEl.textContent = `<${elementInfo.tag}> ${elementInfo.elementText || ''}`;
 
-  let x = pageX;
-  let y = pageY;
+  // Position bubble near the pin (pin center is at pageX, pageY; pin radius = 13)
+  const pinRadius = 13;
+  const margin = 8;
+  let x = pageX + pinRadius + margin;
+  let y = pageY - pinRadius;
   const bw = 284;
   const bh = 140;
-  if (x + bw + 10 > window.innerWidth) x = window.innerWidth - bw - 10;
-  if (y + bh + 60 > window.innerHeight) y = window.innerHeight - bh - 60;
+  if (x + bw + 10 > window.innerWidth) x = pageX - pinRadius - margin - bw;
+  if (y + bh + 10 > window.innerHeight) y = window.innerHeight - bh - 10;
   if (x < 10) x = 10;
   if (y < 10) y = 10;
   commentHost.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647`;
@@ -528,7 +531,7 @@ function removePopover() {
 function addPin(nikkel) {
   if (!pinsContainer) return;
   pinCounter++;
-  const idx = nikkel.idx || pinCounter;
+  const idx = nikkel.idx ?? pinCounter;
   const pin = document.createElement('div');
   pin.dataset.idx = idx;
   pin.dataset.sessionId = nikkel.sessionId || '';
@@ -632,13 +635,17 @@ async function handleDocumentClick(e) {
   if (commentHost) return;
   const target = e.target;
   if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) return;
-  if (target.closest('a')) e.preventDefault();
+  if (target.closest('a, button, input, select, textarea, [role="button"], [onclick]')) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
 
   const info = getElementInfo(target);
   const pageX = Math.round(e.clientX + window.scrollX);
   const pageY = Math.round(e.clientY + window.scrollY);
 
-  const result = await injectCommentBubble(e.clientX, e.clientY, info);
+  const result = await injectCommentBubble(pageX, pageY, info);
   if (!result) return;
 
   const nikkel = {
@@ -655,7 +662,9 @@ async function handleDocumentClick(e) {
   };
 
   console.log('[Nikkel] submitting nikkel', nikkel);
-  bgMsg({ type: 'SUBMIT_NIKKEL', payload: { nikkel } });
+  bgMsg({ type: 'SUBMIT_NIKKEL', payload: { nikkel } }, (res) => {
+    if (!res?.ok) console.error('[Nikkel] Submit failed:', res.error);
+  });
 }
 
 function handleKeydown(e) {
@@ -760,12 +769,10 @@ function resumeActiveReview() {
   chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
     if (res?.ok && res.project) {
       if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate');
-      chrome.runtime.sendMessage({ type: 'GET_NIKKELS' }, (nres) => {
+      chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (nres) => {
         if (nres?.ok && nres.nikkels) {
-          const currentUrl = location.href;
-          const relevant = nres.nikkels.filter((n) => n.pageUrl === currentUrl);
           removeAllPins();
-          relevant.forEach((n) => addPin(n));
+          nres.nikkels.forEach((n) => addPin(n));
         }
       });
     }
