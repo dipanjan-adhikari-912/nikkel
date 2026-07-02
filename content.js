@@ -651,6 +651,7 @@ async function handleDocumentClick(e) {
     selector: result.elementInfo.selector,
     elementText: result.elementInfo.elementText,
     comment: result.comment,
+    idx: pins.length + 1,
   };
 
   console.log('[Nikkel] submitting nikkel', nikkel);
@@ -750,6 +751,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ ok: false, error: err.message });
   });
   return true;
+});
+
+function resumeActiveReview() {
+  chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
+    if (res?.ok && res.project) {
+      if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate');
+      chrome.runtime.sendMessage({ type: 'GET_NIKKELS' }, (nres) => {
+        if (nres?.ok && nres.nikkels) {
+          const currentUrl = location.href;
+          const relevant = nres.nikkels.filter((n) => n.pageUrl === currentUrl);
+          removeAllPins();
+          relevant.forEach((n) => addPin(n));
+        }
+      });
+    }
+  });
+}
+
+resumeActiveReview();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') resumeActiveReview();
 });
 
 let lastUrl = location.href;

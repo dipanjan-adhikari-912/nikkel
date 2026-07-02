@@ -96,12 +96,12 @@ export async function getProjects(token) {
   return supabaseFetch('/rest/v1/projects?select=*&order=created_at.desc', { token });
 }
 
-export async function createProject(title, baseUrl, token) {
+export async function createProject(title, baseUrl, userId, token) {
   const data = await supabaseFetch('/rest/v1/projects', {
     method: 'POST',
     token,
     prefer: 'return=representation',
-    body: JSON.stringify({ title, base_url: baseUrl }),
+    body: JSON.stringify({ title, base_url: baseUrl, owner_id: userId }),
   });
   return Array.isArray(data) ? data[0] : data;
 }
@@ -117,6 +117,7 @@ export async function submitNikkel(data, token) {
   return {
     id: row.id,
     projectId: row.project_id,
+    pageUrl: row.page_url,
     pageX: row.x,
     pageY: row.y,
     tag: row.tag,
@@ -133,6 +134,7 @@ export async function getProjectNikkels(projectId, token) {
   return (rows || []).map(r => ({
     id: r.id,
     projectId: r.project_id,
+    pageUrl: r.page_url,
     pageX: r.x,
     pageY: r.y,
     tag: r.tag,

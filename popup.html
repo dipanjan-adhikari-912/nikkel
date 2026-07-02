@@ -28,10 +28,31 @@
     .share-msg { text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.4; padding: 8px 0; }
     .action-row { display: flex; gap: 6px; }
     .action-row .btn { flex: 1; }
+    #toggleRow { display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; border-bottom: 1px solid #1e293b; font-size: 12px; color: #64748b; }
+    #toggleBtn { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; color: #6366f1; }
+    #toggleBtn.off { color: #475569; }
+    .disabled-msg { text-align: center; padding: 40px 20px; color: #64748b; }
+    .disabled-msg .icon { font-size: 32px; margin-bottom: 8px; }
+    .disabled-msg h2 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #e2e8f0; }
+    .disabled-msg p { font-size: 13px; line-height: 1.4; margin-bottom: 16px; }
   </style>
 </head>
 <body>
   <div id="globalError"></div>
+
+  <div id="toggleRow">
+    <span>Nikkel</span>
+    <button id="toggleBtn" title="Toggle extension">⏻</button>
+  </div>
+
+  <div id="vDisabled" class="view">
+    <div class="disabled-msg">
+      <div class="icon">🔌</div>
+      <h2>Nikkel is off</h2>
+      <p>The extension is disabled. Enable it to start reviewing websites.</p>
+      <button class="btn" id="enableBtn">Enable Nikkel</button>
+    </div>
+  </div>
 
   <div id="vWelcome" class="view active">
     <div class="icon">📌</div>

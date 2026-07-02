@@ -8,6 +8,7 @@ let state = {
   isAnonymous: false,
   nikkels: [],
   mode: 'idle',
+  globalDisabled: false,
 };
 
 let pendingShare = false;
@@ -36,20 +37,32 @@ async function loadState() {
   api.setTokens(state.token, state.refreshToken);
 }
 
-async function sendToTab(tabId, msg) {
-  try {
-    return await chrome.tabs.sendMessage(tabId, msg);
-  } catch {
+async function sendToTab(tabId, msg, retries = 5) {
+  for (let i = 0; i < retries; i++) {
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
       return await chrome.tabs.sendMessage(tabId, msg);
     } catch {
-      return null;
+      if (i === 0) {
+        try { await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }); } catch {}
+      }
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 200));
     }
   }
+  return null;
 }
 
 let ready = loadState();
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  await ready;
+  if (state.globalDisabled) return;
+  if (state.project) {
+    await sendToTab(activeInfo.tabId, {
+      type: 'ACTIVATE',
+      payload: { projectName: state.project.title, sessionId: state.project.id, shareUrl: '' },
+    });
+  }
+});
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handle = async () => {
@@ -59,7 +72,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE':
-        return { ok: true, user: state.user, mode: state.mode, project: state.project, isAnonymous: state.isAnonymous, pendingShare };
+        return { ok: true, user: state.user, mode: state.mode, project: state.project, isAnonymous: state.isAnonymous, pendingShare, globalDisabled: state.globalDisabled };
 
       case 'INIT_ANONYMOUS': {
         if (state.token && state.user) return { ok: true, user: state.user, isAnonymous: state.isAnonymous };
@@ -73,6 +86,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       case 'START_REVIEW': {
+        if (state.globalDisabled) return { ok: false, error: 'Nikkel is disabled' };
         const { tabId, title, url } = msg.payload;
         if (!state.token) {
           const anon = await api.signInAnonymously();
@@ -83,7 +97,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await saveState();
           api.setTokens(state.token, state.refreshToken);
         }
-        const project = await api.createProject(title || 'Untitled Review', url || '', state.token);
+        const project = await api.createProject(title || 'Untitled Review', url || '', state.user?.id, state.token);
         state.project = project;
         state.mode = 'annotate';
         state.nikkels = [];
@@ -111,7 +125,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'SUBMIT_NIKKEL': {
         if (!state.project) throw new Error('No active project');
         const d = msg.payload.nikkel;
-        const idx = state.nikkels.length + 1;
         const saved = await api.submitNikkel({
           project_id: state.project.id,
           page_url: d.pageUrl,
@@ -123,7 +136,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           tag: d.tag,
           element_text: d.elementText,
           comment: d.comment,
-          idx,
+          idx: d.idx,
         }, state.token);
         state.nikkels.push(saved);
         await saveState();
@@ -168,10 +181,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, user: state.user };
       }
 
+      case 'ACTIVATE_TAB': {
+        if (state.project && msg.payload?.tabId) {
+          await sendToTab(msg.payload.tabId, {
+            type: 'ACTIVATE',
+            payload: { projectName: state.project.title, sessionId: state.project.id, shareUrl: '' },
+          });
+        }
+        return { ok: true };
+      }
+
       case 'MODE_CHANGED': {
         state.mode = msg.payload.mode;
         await saveState();
         return { ok: true };
+      }
+
+      case 'TOGGLE_DISABLED': {
+        state.globalDisabled = msg.payload?.disabled;
+        if (state.globalDisabled) {
+          const tabId = msg.payload?.tabId;
+          if (tabId) await sendToTab(tabId, { type: 'DEACTIVATE' });
+          state.project = null;
+          state.nikkels = [];
+          state.mode = 'idle';
+        }
+        await saveState();
+        return { ok: true, globalDisabled: state.globalDisabled };
       }
 
       case 'SIGN_OUT': {

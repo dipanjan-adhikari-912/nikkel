@@ -34,12 +34,37 @@ async function init() {
   let state = await bg({ type: 'GET_STATE' });
   console.log('[Popup] GET_STATE', state);
 
+  $('toggleBtn').className = state.globalDisabled ? 'off' : '';
+  $('toggleBtn').textContent = state.globalDisabled ? '⏻' : '⏻';
+
+  if (state.globalDisabled) {
+    showView('vDisabled');
+    return;
+  }
+
   if (state.project) {
+    const tab = await getActiveTab();
+    if (tab) {
+      await bg({ type: 'ACTIVATE_TAB', payload: { tabId: tab.id } });
+    }
     showActiveView(state);
   } else {
     showWelcomeView(state);
   }
 }
+
+$('toggleBtn').addEventListener('click', async () => {
+  const state = await bg({ type: 'GET_STATE' });
+  const tab = await getActiveTab();
+  const res = await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: !state.globalDisabled, tabId: tab?.id } });
+  if (res.ok) init();
+});
+
+$('enableBtn').addEventListener('click', async () => {
+  const tab = await getActiveTab();
+  await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: false, tabId: tab?.id } });
+  init();
+});
 
 function showWelcomeView(state) {
   showView('vWelcome');
