@@ -14,7 +14,7 @@ const tabState = new Map();
 
 function getTabState(tabId) {
   if (!tabState.has(tabId)) {
-    tabState.set(tabId, { mode: 'idle', project: null, nikkels: [], url: '', title: '' });
+    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '' });
   }
   return tabState.get(tabId);
 }
@@ -24,7 +24,7 @@ let pendingShare = null; // { tabId, projectId, shareToken }
 async function saveState() {
   const tabObj = {};
   for (const [tabId, ts] of tabState) {
-    if (ts.project) tabObj[String(tabId)] = { mode: ts.mode, project: ts.project, nikkels: ts.nikkels };
+    if (ts.project) tabObj[String(tabId)] = { mode: ts.mode, project: ts.project, review: ts.review, nikkels: ts.nikkels };
   }
   await chrome.storage.local.set({
     nikkelState: globalState,
@@ -78,7 +78,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (ts.project) {
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
-      payload: { projectName: ts.project.title, sessionId: ts.project.id, shareUrl: '' },
+      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '' },
     });
   }
 });
@@ -105,7 +105,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE':
-        return { ok: true, user: globalState.user, mode: ts?.mode || 'idle', project: ts?.project || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '' };
+        return { ok: true, user: globalState.user, mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '' };
 
       case 'INIT_ANONYMOUS': {
         if (globalState.token && globalState.user) return { ok: true, user: globalState.user, isAnonymous: globalState.isAnonymous };
@@ -131,8 +131,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           api.setTokens(globalState.token, globalState.refreshToken);
         }
         const project = await api.createProject(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
+        const review = await api.createReview(project.id, globalState.user?.id, globalState.token);
         const tab = getTabState(tId);
         tab.project = project;
+        tab.review = review;
         tab.mode = 'annotate';
         tab.nikkels = [];
         tab.url = url || tab.url;
@@ -140,10 +142,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           await sendToTab(tId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, shareUrl: '' },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '' },
           });
         }
-        return { ok: true, project };
+        return { ok: true, project, review };
       }
 
       case 'STOP_REVIEW': {
@@ -151,6 +153,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           const tab = getTabState(tId);
           tab.project = null;
+          tab.review = null;
           tab.nikkels = [];
           tab.mode = 'idle';
           await saveState();
@@ -163,10 +166,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const srcTabId = sender.tab?.id;
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
-        if (!tab.project) throw new Error('No active project');
+        if (!tab.project || !tab.review) throw new Error('No active project or review');
         const d = msg.payload.nikkel;
         const saved = await api.submitNikkel({
-          project_id: tab.project.id,
+          review_id: tab.review.id,
           page_url: d.pageUrl,
           dom_selector: d.selector,
           x: d.pageX,
@@ -188,9 +191,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const srcTabId = sender.tab?.id || tabId;
         if (!srcTabId) return { ok: true, nikkels: [] };
         const tab = getTabState(srcTabId);
-        if (!tab.project) return { ok: true, nikkels: [] };
+        if (!tab.project || !tab.review) return { ok: true, nikkels: [] };
         const pageUrl = msg.payload?.pageUrl || tab.url;
-        const nikkels = await api.getProjectNikkels(tab.project.id, pageUrl, globalState.token);
+        const nikkels = await api.getReviewNikkels(tab.review.id, pageUrl, globalState.token);
         tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
@@ -218,8 +221,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         globalState.isAnonymous = false;
         if (pendingShare && pendingShare.tabId) {
           const ts = getTabState(pendingShare.tabId);
-          if (ts.project && ts.project.share_token) {
-            const shareUrl = `https://nikkel.app/board/${ts.project.share_token}`;
+          if (ts.review) {
+            const shareToken = await api.ensureShareToken(ts.review.id, globalState.token);
+            const shareUrl = `https://nikkel.app/review/${shareToken}`;
             pendingShare = null;
             await saveState();
             return { ok: true, user: globalState.user, shareUrl };
@@ -236,7 +240,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (tab.project) {
             await sendToTab(tId, {
               type: 'ACTIVATE',
-              payload: { projectName: tab.project.title, sessionId: tab.project.id, shareUrl: '' },
+              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '' },
             });
           }
         }
@@ -292,18 +296,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true };
       }
 
+      case 'LOAD_REVIEW': {
+        const rt = msg.payload?.reviewToken;
+        console.log('[BG] LOAD_REVIEW', rt);
+        return { ok: true };
+      }
+
       case 'SHARE': {
         const srcTabId = sender.tab?.id || tabId;
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
-        if (!tab.project) return { ok: false, error: 'No active project' };
+        if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
         if (globalState.isAnonymous) {
-          pendingShare = { tabId: srcTabId, projectId: tab.project.id, shareToken: tab.project.share_token };
+          pendingShare = { tabId: srcTabId, reviewId: tab.review.id };
           await saveState();
           return { ok: true, needsAuth: true };
         }
-        // User is authenticated, return share URL directly
-        const shareUrl = `https://nikkel.app/board/${tab.project.share_token}`;
+        const shareToken = await api.ensureShareToken(tab.review.id, globalState.token);
+        const shareUrl = `https://nikkel.app/review/${shareToken}`;
         return { ok: true, shareUrl };
       }
 

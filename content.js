@@ -172,6 +172,7 @@ let savedPaddingBottom = '';
 let isPinsVisible = true;
 let commentResolve = null;
 let currentSessionId = null;
+let currentReviewId = null;
 let pollInterval = null;
 
 const NIKKEL_SKIP_SELECTORS = '#nikkel-bar-host, #nikkel-comment-host, #nikkel-popover-host, #nikkel-pins';
@@ -245,13 +246,14 @@ function stopPolling() {
   }
 }
 
-function injectBar(projectName, sessionId, shareUrl, initialMode) {
+function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId) {
   if (barHost) {
     console.log('[Nikkel] injectBar: barHost already exists, skipping');
     return;
   }
-  console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode });
+  console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode, reviewId });
   currentSessionId = sessionId || null;
+  currentReviewId = reviewId || null;
   barHost = createShadowHost('nikkel-bar-host');
   const shadow = barHost.attachShadow({ mode: 'open' });
   shadow.innerHTML = BAR_HTML;
@@ -410,6 +412,7 @@ function removeBar() {
   pins = [];
   pinCounter = 0;
   currentSessionId = null;
+  currentReviewId = null;
   document.body.style.paddingBottom = savedPaddingBottom;
   document.getElementById('nikkel-cursor')?.remove();
   currentMode = 'idle';
@@ -731,7 +734,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     console.log('[Nikkel] received message', msg.type);
     switch (msg.type) {
       case 'ACTIVATE': {
-        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, 'annotate');
+        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, 'annotate', msg.payload.reviewId);
         return { ok: true };
       }
       case 'DEACTIVATE': {
@@ -746,7 +749,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, url: location.href, title: document.title };
       }
       case 'LOAD_SESSION': {
-        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate');
+        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate', msg.payload.reviewId);
         removeAllPins();
         for (const n of msg.payload.nikkels) {
           addPin(n);
@@ -768,7 +771,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 function resumeActiveReview() {
   chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
     if (res?.ok && res.project) {
-      if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate');
+      if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id);
       chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (nres) => {
         if (nres?.ok && nres.nikkels) {
           removeAllPins();
@@ -794,4 +797,13 @@ function checkUrlChange() {
 window.addEventListener('popstate', checkUrlChange);
 window.addEventListener('hashchange', checkUrlChange);
 setInterval(checkUrlChange, 1000);
+
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'PING') {
+    window.postMessage({ type: 'PONG', source: 'nikkel-extension' }, '*');
+  }
+  if (event.data?.action === 'LOAD_REVIEW') {
+    chrome.runtime.sendMessage({ type: 'LOAD_REVIEW', payload: { reviewToken: event.data.reviewToken } });
+  }
+});
 })();

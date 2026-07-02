@@ -6,12 +6,12 @@ import { uploadScreenshot } from '../services/storage.js'
 
 const router = Router()
 
-router.get('/projects/:projectId/nikkels', requireAuth, async (req, res) => {
+router.get('/reviews/:reviewId/nikkels', requireAuth, async (req, res) => {
   try {
     const { data, error } = await db
       .from('nikkels')
       .select('*, replies(*)')
-      .eq('project_id', req.params.projectId)
+      .eq('review_id', req.params.reviewId)
       .order('created_at', { ascending: false })
     if (error) return res.status(500).json({ error: error.message })
     res.json(data)
@@ -20,7 +20,7 @@ router.get('/projects/:projectId/nikkels', requireAuth, async (req, res) => {
   }
 })
 
-router.post('/projects/:projectId/nikkels', requireAuth, async (req, res) => {
+router.post('/reviews/:reviewId/nikkels', requireAuth, async (req, res) => {
   try {
     const { pageUrl, selector, coordX, coordY, elementTag, elementText, commentText, screenshotBase64 } = req.body
     if (!pageUrl || !commentText) {
@@ -35,7 +35,7 @@ router.post('/projects/:projectId/nikkels', requireAuth, async (req, res) => {
     const { data, error } = await db
       .from('nikkels')
       .insert({
-        project_id: req.params.projectId,
+        review_id: req.params.reviewId,
         page_url: pageUrl,
         selector,
         coord_x: coordX,
@@ -54,6 +54,30 @@ router.post('/projects/:projectId/nikkels', requireAuth, async (req, res) => {
     enqueueNikkel(data.id).catch(console.error)
 
     res.status(201).json(data)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Backward-compatible: get nikkels for a project (resolves through reviews)
+router.get('/projects/:projectId/nikkels', requireAuth, async (req, res) => {
+  try {
+    const { data: reviews } = await db
+      .from('reviews')
+      .select('id')
+      .eq('project_id', req.params.projectId)
+
+    if (!reviews || reviews.length === 0) return res.json([])
+
+    const reviewIds = reviews.map(r => r.id)
+    const { data, error } = await db
+      .from('nikkels')
+      .select('*, replies(*)')
+      .in('review_id', reviewIds)
+      .order('created_at', { ascending: false })
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

@@ -9,6 +9,7 @@ document.getElementById('redirectUri').textContent = `https://${extId}.chromiuma
 
 let token = null;
 let projectId = null;
+let reviewId = null;
 let passCount = 0, failCount = 0;
 
 async function sfetch(path, opts = {}) {
@@ -108,22 +109,33 @@ const tests = {
     projectId = p.id;
     log('ok', 'createProject', { id: p.id, title: p.title, base_url: p.base_url });
   },
-  async submitNikkel() {
+  async createReview() {
     if (!token) throw new Error('Sign in first');
     if (!projectId) throw new Error('Create a project first');
-    const existing = await sfetch(`/rest/v1/nikkels?project_id=eq.${projectId}&select=id`, { token });
+    const data = await sfetch('/rest/v1/reviews', {
+      method: 'POST', token, prefer: 'return=representation',
+      body: JSON.stringify({ project_id: projectId }),
+    });
+    const r = Array.isArray(data) ? data[0] : data;
+    reviewId = r.id;
+    log('ok', 'createReview', { id: r.id, share_token: r.share_token });
+  },
+  async submitNikkel() {
+    if (!token) throw new Error('Sign in first');
+    if (!reviewId) throw new Error('Create a review first');
+    const existing = await sfetch(`/rest/v1/nikkels?review_id=eq.${reviewId}&select=id`, { token });
     const idx = (existing || []).length + 1;
     const data = await sfetch('/rest/v1/nikkels', {
       method: 'POST', token, prefer: 'return=representation',
-      body: JSON.stringify({ project_id: projectId, x: 400, y: 300, dom_selector: '.cta', tag: 'button', element_text: 'Click Me', comment: 'Debug pin ' + idx, idx }),
+      body: JSON.stringify({ review_id: reviewId, x: 400, y: 300, dom_selector: '.cta', tag: 'button', element_text: 'Click Me', comment: 'Debug pin ' + idx, idx }),
     });
     const n = Array.isArray(data) ? data[0] : data;
     log('ok', 'submitNikkel', { id: n.id, idx: n.idx, comment: n.comment });
   },
   async getNikkels() {
     if (!token) throw new Error('Sign in first');
-    if (!projectId) throw new Error('Create a project first');
-    const data = await sfetch(`/rest/v1/nikkels?project_id=eq.${projectId}&order=idx.asc`, { token });
+    if (!reviewId) throw new Error('Create a review first');
+    const data = await sfetch(`/rest/v1/nikkels?review_id=eq.${reviewId}&order=idx.asc`, { token });
     log('ok', 'getNikkels', { count: data.length, nikkels: data });
   },
 };
@@ -145,6 +157,7 @@ async function runTest(name) {
       name === 'checkGoogleOAuth' ? 'Check Google OAuth Config' :
       name === 'getProjects' ? 'Get Projects' :
       name === 'createProject' ? 'Create Project' :
+      name === 'createReview' ? 'Create Review' :
       name === 'submitNikkel' ? 'Submit Nikkel' : 'Get Nikkels';
   }
 }
@@ -154,7 +167,7 @@ document.querySelectorAll('[data-test]').forEach(btn => {
 });
 
 document.getElementById('runAll').addEventListener('click', async () => {
-  const order = ['anonSignIn', 'checkGoogleOAuth', 'getProjects', 'createProject', 'submitNikkel', 'getNikkels'];
+  const order = ['anonSignIn', 'checkGoogleOAuth', 'getProjects', 'createProject', 'createReview', 'submitNikkel', 'getNikkels'];
   disableAll(true);
   document.getElementById('runAll').innerHTML = '<span class="spinner"></span> Running…';
   for (const name of order) {

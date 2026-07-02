@@ -47,17 +47,30 @@ router.get('/:id', requireAuth, async (req, res) => {
       .single()
     if (error) return res.status(404).json({ error: 'Project not found' })
 
-    const { data: nikkels, error: nikkelError } = await db
-      .from('nikkels')
-      .select('status')
+    const { data: reviews, error: reviewsError } = await db
+      .from('reviews')
+      .select('id')
       .eq('project_id', req.params.id)
-    if (nikkelError) return res.status(500).json({ error: nikkelError.message })
 
-    const summary = {
-      total: nikkels.length,
-      open: nikkels.filter(n => n.status === 'open').length,
-      in_progress: nikkels.filter(n => n.status === 'in_progress').length,
-      resolved: nikkels.filter(n => n.status === 'resolved').length
+    if (reviewsError) return res.status(500).json({ error: reviewsError.message })
+
+    const reviewIds = (reviews || []).map(r => r.id)
+    let summary = { total: 0, open: 0, in_progress: 0, resolved: 0 }
+
+    if (reviewIds.length > 0) {
+      const { data: nikkels, error: nikkelError } = await db
+        .from('nikkels')
+        .select('status')
+        .in('review_id', reviewIds)
+
+      if (!nikkelError) {
+        summary = {
+          total: nikkels.length,
+          open: nikkels.filter(n => n.status === 'open').length,
+          in_progress: nikkels.filter(n => n.status === 'in_progress').length,
+          resolved: nikkels.filter(n => n.status === 'resolved').length
+        }
+      }
     }
 
     res.json({ ...project, summary })

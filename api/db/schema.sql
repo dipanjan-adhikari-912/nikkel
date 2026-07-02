@@ -21,9 +21,23 @@ create table if not exists projects (
   created_at timestamptz default now()
 );
 
+-- Reviews (shareable links)
+create table if not exists reviews (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  share_token text unique not null default encode(gen_random_bytes(16), 'hex'),
+  visibility text default 'public' check (visibility in ('public', 'private')),
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_reviews_share_token on reviews(share_token);
+create index if not exists idx_reviews_project_id on reviews(project_id);
+create index if not exists idx_reviews_owner_id on reviews(owner_id);
+
 create table if not exists nikkels (
   id uuid primary key default gen_random_uuid(),
-  project_id uuid references projects(id) on delete cascade,
+  review_id uuid not null references reviews(id) on delete cascade,
   page_url text not null,
   selector text,
   coord_x float,
@@ -64,7 +78,7 @@ create table if not exists integrations (
   created_at timestamptz default now()
 );
 
-create index if not exists idx_nikkels_project_id on nikkels(project_id);
+create index if not exists idx_nikkels_review_id on nikkels(review_id);
 create index if not exists idx_nikkels_status on nikkels(status);
 create index if not exists idx_replies_nikkel_id on replies(nikkel_id);
 create index if not exists idx_projects_org_id on projects(org_id);
