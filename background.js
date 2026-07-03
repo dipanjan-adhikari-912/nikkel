@@ -1,6 +1,9 @@
-import * as api from './api.js';
+import { container } from './src/di/index.js';
+import { VIEWER_BASE } from './src/config/index.js';
+import { SUPABASE_URL } from './src/infrastructure/supabase/SupabaseClient.js';
 
-// Global auth state (shared across all tabs)
+const { supabaseClient, authService, projectService, pinService, shareService } = container;
+
 const globalState = {
   user: null,
   token: null,
@@ -9,7 +12,6 @@ const globalState = {
   globalDisabled: false,
 };
 
-// Per-tab state (keyed by tabId)
 const tabState = new Map();
 
 function getTabState(tabId) {
@@ -19,7 +21,7 @@ function getTabState(tabId) {
   return tabState.get(tabId);
 }
 
-let pendingShare = null; // { tabId }
+let pendingShare = null;
 
 async function saveState() {
   const tabObj = {};
@@ -45,10 +47,10 @@ async function loadState() {
   if (globalState.token && !globalState.refreshToken) {
     globalState.user = null;
     globalState.token = null;
-    globalState.isAnonymous = false;
+    globalState.refreshToken = null;
     await saveState();
   }
-  api.setTokens(globalState.token, globalState.refreshToken);
+  supabaseClient.setTokens(globalState.token, globalState.refreshToken);
 }
 
 async function sendToTab(tabId, msg, retries = 5) {
@@ -63,37 +65,6 @@ async function sendToTab(tabId, msg, retries = 5) {
     }
   }
   return null;
-}
-
-async function ensureProjectReview(projectId, userId, token, tabStateEntry) {
-  // Query Supabase for existing reviews for this project
-  try {
-    const existing = await api.getProjectReviews(projectId, token);
-    if (existing && existing.length > 0) {
-      const review = existing[0];
-      if (tabStateEntry) tabStateEntry.review = review;
-      console.log('[BG] Reusing existing review', review.id);
-      return review;
-    }
-  } catch (e) {
-    console.warn('[BG] Error checking for existing reviews', e.message);
-  }
-
-  // No existing review — create one
-  try {
-    const review = await api.createReview(projectId, userId, token);
-    if (!review) {
-      console.error('[BG] createReview returned empty');
-      return null;
-    }
-    console.log('[BG] Created new review', review.id);
-    if (tabStateEntry) tabStateEntry.review = review;
-    await saveState();
-    return review;
-  } catch (e) {
-    console.error('[BG] Failed to create review', e.message);
-    return null;
-  }
 }
 
 let ready = loadState();
@@ -128,8 +99,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handle = async () => {
     await ready;
-    api.setTokens(globalState.token, globalState.refreshToken);
-    console.log('[BG] message', msg.type, msg.payload);
+    supabaseClient.setTokens(globalState.token, globalState.refreshToken);
 
     const tabId = msg.payload?.tabId || sender.tab?.id;
     const ts = tabId ? getTabState(tabId) : null;
@@ -140,7 +110,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'INIT_ANONYMOUS': {
         if (globalState.token && globalState.user) return { ok: true, user: globalState.user, isAnonymous: globalState.isAnonymous };
-        const result = await api.signInAnonymously();
+        const result = await authService.signInAnonymously();
         globalState.user = result.user;
         globalState.token = result.token;
         globalState.refreshToken = result.refreshToken;
@@ -153,16 +123,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (globalState.globalDisabled) return { ok: false, error: 'Nikkel is disabled' };
         const { tabId: tId, title, url } = msg.payload;
         if (!globalState.token) {
-          const anon = await api.signInAnonymously();
+          const anon = await authService.signInAnonymously();
           globalState.user = anon.user;
           globalState.token = anon.token;
           globalState.refreshToken = anon.refreshToken;
           globalState.isAnonymous = true;
           await saveState();
-          api.setTokens(globalState.token, globalState.refreshToken);
+          supabaseClient.setTokens(globalState.token, globalState.refreshToken);
         }
-        const project = await api.createProject(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
-        const review = await api.createReview(project.id, globalState.user?.id, globalState.token);
+        const project = await projectService.create(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
+        const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token);
         const tab = getTabState(tId);
         tab.project = project;
         tab.review = review;
@@ -173,7 +143,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           await sendToTab(tId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '' },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '' },
           });
         }
         return { ok: true, project, review };
@@ -197,18 +167,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const srcTabId = sender.tab?.id;
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
-        if (!tab.project || !tab.review) throw new Error('No active project or review');
+        if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
         const d = msg.payload.nikkel;
-        const saved = await api.submitNikkel({
-          review_id: tab.review.id,
-          page_url: d.pageUrl,
-          dom_selector: d.selector,
-          x: d.pageX,
-          y: d.pageY,
-          viewport_w: d.viewportW,
-          viewport_h: d.viewportH,
+        const saved = await pinService.create({
+          reviewId: tab.review.id,
+          pageUrl: d.pageUrl,
+          selector: d.selector,
+          pageX: d.pageX,
+          pageY: d.pageY,
+          viewportW: d.viewportW,
+          viewportH: d.viewportH,
           tag: d.tag,
-          element_text: d.elementText,
+          elementText: d.elementText,
           comment: d.comment,
           idx: d.idx,
         }, globalState.token);
@@ -224,14 +194,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const tab = getTabState(srcTabId);
         if (!tab.project || !tab.review) return { ok: true, nikkels: [] };
         const pageUrl = msg.payload?.pageUrl || tab.url;
-        const nikkels = await api.getReviewNikkels(tab.review.id, pageUrl, globalState.token);
+        const nikkels = await pinService.findByReview(tab.review.id, { pageUrl }, globalState.token);
         tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
 
       case 'SIGN_IN_GOOGLE': {
         const redirectUrl = chrome.identity.getRedirectURL();
-        const oauthUrl = `${api.SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
+        const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
         let redirect;
         try {
           redirect = await chrome.identity.launchWebAuthFlow({ url: oauthUrl, interactive: true });
@@ -244,19 +214,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
         if (!accessToken) return { ok: false, error: 'No access token in response' };
-        api.setTokens(accessToken, refreshToken);
-        const userInfo = await supabaseUserInfo(accessToken);
-        globalState.user = { id: userInfo.id, email: userInfo.email, name: userInfo.user_metadata?.name, is_anonymous: false };
+        supabaseClient.setTokens(accessToken, refreshToken);
+        globalState.user = await authService.getUserInfo(accessToken);
         globalState.token = accessToken;
         globalState.refreshToken = refreshToken;
         globalState.isAnonymous = false;
         if (pendingShare && pendingShare.tabId) {
           const ts = getTabState(pendingShare.tabId);
           if (ts.project) {
-            let review = await ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token, ts);
+            let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
             if (review) {
-              const shareToken = await api.ensureShareToken(review.id, globalState.token);
-              const shareUrl = `${api.VIEWER_BASE}/review/${shareToken}`;
+              ts.review = review;
+              const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
+              const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
               pendingShare = null;
               await saveState();
               return { ok: true, user: globalState.user, shareUrl };
@@ -310,7 +280,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'TOGGLE_DISABLED': {
         globalState.globalDisabled = msg.payload?.disabled;
         if (globalState.globalDisabled) {
-          // Deactivate all tabs
           for (const [id, t] of tabState) {
             if (t.project) {
               t.project = null;
@@ -336,16 +305,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'LOAD_REVIEW': {
         const rt = msg.payload?.reviewToken;
-        console.log('[BG] LOAD_REVIEW', rt);
         if (!rt) return { ok: false, error: 'No review token provided' };
-        const review = await api.getReviewByShareToken(rt);
+        const review = await shareService.getReviewByShareToken(rt);
         if (!review) return { ok: false, error: 'Review not found' };
         const project = review.project;
         if (!project) return { ok: false, error: 'Project not found for review' };
         const targetUrl = project.base_url || project.url;
         if (!targetUrl) return { ok: false, error: 'Project has no target URL' };
 
-        // Normalize URL for matching — strip trailing slash
         const normalized = targetUrl.replace(/\/+$/, '');
         const tabs = await chrome.tabs.query({});
         const existing = tabs.find(t => t.url && t.url.replace(/\/+$/, '') === normalized && !t.url.startsWith('chrome-extension://'));
@@ -368,13 +335,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         getTabState(tab.id).url = targetUrl;
         getTabState(tab.id).readOnly = true;
         await saveState();
-        if (!reused) {
-          // On a fresh tab, content script loads and fetches pins via resumeActiveReview
-        } else {
-          // On reused tab, force a pin refresh
+        if (reused) {
           const ts = getTabState(tab.id);
           try {
-            const nikkels = await api.getReviewNikkels(ts.review.id, normalized, globalState.token);
+            const nikkels = await pinService.findByReview(ts.review.id, { pageUrl: normalized }, globalState.token);
             ts.nikkels = nikkels;
             await sendToTab(tab.id, {
               type: 'LOAD_SESSION',
@@ -397,12 +361,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return { ok: true, needsAuth: true };
         }
 
-        // Ensure a review exists in Supabase for this project
-        let review = await ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token, tab);
+        let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
         if (!review) return { ok: false, error: 'Failed to create review' };
+        tab.review = review;
 
-        const shareToken = await api.ensureShareToken(review.id, globalState.token);
-        const shareUrl = `${api.VIEWER_BASE}/review/${shareToken}`;
+        const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
+        const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
         return { ok: true, shareUrl };
       }
 
@@ -412,10 +376,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   };
 
   handle().then((result) => {
-    const nt = api.getToken();
+    const nt = supabaseClient.getToken();
     if (nt && nt !== globalState.token) {
       globalState.token = nt;
-      globalState.refreshToken = api.getRefreshToken();
+      globalState.refreshToken = supabaseClient.getRefreshToken();
       saveState();
     }
     sendResponse(result);
@@ -425,10 +389,4 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
-async function supabaseUserInfo(accessToken) {
-  const res = await fetch(`${api.SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: api.SUPABASE_ANON, Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error('Failed to get user info');
-  return res.json();
-}
+
