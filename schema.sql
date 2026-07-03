@@ -29,6 +29,12 @@ create policy "Owners can update projects"
   on projects for update
   using (auth.uid() = owner_id);
 
+create policy "Anyone can view projects linked to public reviews"
+  on projects for select
+  using (exists (
+    select 1 from reviews where reviews.project_id = projects.id and visibility = 'public'
+  ));
+
 -- Reviews (shareable links, belong to a project)
 create table reviews (
   id uuid primary key default gen_random_uuid(),

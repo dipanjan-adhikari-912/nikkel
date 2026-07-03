@@ -14,17 +14,17 @@ const tabState = new Map();
 
 function getTabState(tabId) {
   if (!tabState.has(tabId)) {
-    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '' });
+    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '', readOnly: false });
   }
   return tabState.get(tabId);
 }
 
-let pendingShare = null; // { tabId, projectId, shareToken }
+let pendingShare = null; // { tabId }
 
 async function saveState() {
   const tabObj = {};
   for (const [tabId, ts] of tabState) {
-    if (ts.project) tabObj[String(tabId)] = { mode: ts.mode, project: ts.project, review: ts.review, nikkels: ts.nikkels };
+    if (ts.project) tabObj[String(tabId)] = { mode: ts.mode, project: ts.project, review: ts.review, nikkels: ts.nikkels, readOnly: ts.readOnly };
   }
   await chrome.storage.local.set({
     nikkelState: globalState,
@@ -65,6 +65,37 @@ async function sendToTab(tabId, msg, retries = 5) {
   return null;
 }
 
+async function ensureProjectReview(projectId, userId, token, tabStateEntry) {
+  // Query Supabase for existing reviews for this project
+  try {
+    const existing = await api.getProjectReviews(projectId, token);
+    if (existing && existing.length > 0) {
+      const review = existing[0];
+      if (tabStateEntry) tabStateEntry.review = review;
+      console.log('[BG] Reusing existing review', review.id);
+      return review;
+    }
+  } catch (e) {
+    console.warn('[BG] Error checking for existing reviews', e.message);
+  }
+
+  // No existing review — create one
+  try {
+    const review = await api.createReview(projectId, userId, token);
+    if (!review) {
+      console.error('[BG] createReview returned empty');
+      return null;
+    }
+    console.log('[BG] Created new review', review.id);
+    if (tabStateEntry) tabStateEntry.review = review;
+    await saveState();
+    return review;
+  } catch (e) {
+    console.error('[BG] Failed to create review', e.message);
+    return null;
+  }
+}
+
 let ready = loadState();
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
@@ -78,7 +109,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (ts.project) {
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
-      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '' },
+      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly },
     });
   }
 });
@@ -105,7 +136,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE':
-        return { ok: true, user: globalState.user, mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '' };
+        return { ok: true, user: globalState.user, mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false };
 
       case 'INIT_ANONYMOUS': {
         if (globalState.token && globalState.user) return { ok: true, user: globalState.user, isAnonymous: globalState.isAnonymous };
@@ -221,12 +252,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         globalState.isAnonymous = false;
         if (pendingShare && pendingShare.tabId) {
           const ts = getTabState(pendingShare.tabId);
-          if (ts.review) {
-            const shareToken = await api.ensureShareToken(ts.review.id, globalState.token);
-            const shareUrl = `https://nikkel.app/review/${shareToken}`;
-            pendingShare = null;
-            await saveState();
-            return { ok: true, user: globalState.user, shareUrl };
+          if (ts.project) {
+            let review = await ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token, ts);
+            if (review) {
+              const shareToken = await api.ensureShareToken(review.id, globalState.token);
+              const shareUrl = `${api.VIEWER_BASE}/review/${shareToken}`;
+              pendingShare = null;
+              await saveState();
+              return { ok: true, user: globalState.user, shareUrl };
+            }
           }
         }
         await saveState();
@@ -240,7 +274,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (tab.project) {
             await sendToTab(tId, {
               type: 'ACTIVATE',
-              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '' },
+              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly },
             });
           }
         }
@@ -252,6 +286,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (srcTabId) {
           const tab = getTabState(srcTabId);
           const newMode = msg.payload.mode;
+
+          if (newMode === 'annotate' && tab.readOnly) {
+            return { ok: false, error: 'This review is read-only' };
+          }
 
           // Only one tab can annotate at a time — exit annotate on all others
           if (newMode === 'annotate') {
@@ -299,21 +337,72 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'LOAD_REVIEW': {
         const rt = msg.payload?.reviewToken;
         console.log('[BG] LOAD_REVIEW', rt);
-        return { ok: true };
+        if (!rt) return { ok: false, error: 'No review token provided' };
+        const review = await api.getReviewByShareToken(rt);
+        if (!review) return { ok: false, error: 'Review not found' };
+        const project = review.project;
+        if (!project) return { ok: false, error: 'Project not found for review' };
+        const targetUrl = project.base_url || project.url;
+        if (!targetUrl) return { ok: false, error: 'Project has no target URL' };
+
+        // Normalize URL for matching — strip trailing slash
+        const normalized = targetUrl.replace(/\/+$/, '');
+        const tabs = await chrome.tabs.query({});
+        const existing = tabs.find(t => t.url && t.url.replace(/\/+$/, '') === normalized && !t.url.startsWith('chrome-extension://'));
+
+        let tab;
+        let reused = false;
+        if (existing) {
+          tab = existing;
+          reused = true;
+          await chrome.tabs.update(tab.id, { active: true });
+          await chrome.windows.update(tab.windowId, { focused: true });
+        } else {
+          tab = await chrome.tabs.create({ url: targetUrl, active: true });
+        }
+
+        getTabState(tab.id).project = project;
+        getTabState(tab.id).review = { id: review.id, share_token: rt };
+        getTabState(tab.id).mode = 'browse';
+        getTabState(tab.id).nikkels = [];
+        getTabState(tab.id).url = targetUrl;
+        getTabState(tab.id).readOnly = true;
+        await saveState();
+        if (!reused) {
+          // On a fresh tab, content script loads and fetches pins via resumeActiveReview
+        } else {
+          // On reused tab, force a pin refresh
+          const ts = getTabState(tab.id);
+          try {
+            const nikkels = await api.getReviewNikkels(ts.review.id, normalized, globalState.token);
+            ts.nikkels = nikkels;
+            await sendToTab(tab.id, {
+              type: 'LOAD_SESSION',
+              payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels },
+            });
+          } catch {}
+        }
+        return { ok: true, targetUrl, reused };
       }
 
       case 'SHARE': {
         const srcTabId = sender.tab?.id || tabId;
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
-        if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
+        if (!tab.project) return { ok: false, error: 'No active project' };
+
         if (globalState.isAnonymous) {
-          pendingShare = { tabId: srcTabId, reviewId: tab.review.id };
+          pendingShare = { tabId: srcTabId };
           await saveState();
           return { ok: true, needsAuth: true };
         }
-        const shareToken = await api.ensureShareToken(tab.review.id, globalState.token);
-        const shareUrl = `https://nikkel.app/review/${shareToken}`;
+
+        // Ensure a review exists in Supabase for this project
+        let review = await ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token, tab);
+        if (!review) return { ok: false, error: 'Failed to create review' };
+
+        const shareToken = await api.ensureShareToken(review.id, globalState.token);
+        const shareUrl = `${api.VIEWER_BASE}/review/${shareToken}`;
         return { ok: true, shareUrl };
       }
 

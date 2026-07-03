@@ -1,53 +1,109 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/nikkel/'
 
 export default function ReviewPage({ params }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [extensionDetected, setExtensionDetected] = useState(false)
+  const [opening, setOpening] = useState(false)
+  const [openingError, setOpeningError] = useState(null)
+  const openTimeoutRef = useRef(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/board/${params.token}`)
       .then(r => {
-        if (!r.ok) throw new Error('Review not found')
+        if (r.status === 404) throw new Error('not-found')
+        if (!r.ok) throw new Error('server-error')
         return r.json()
       })
       .then(d => setData(d))
-      .catch(() => setError('Review not found'))
+      .catch(err => {
+        if (err.message === 'not-found') setError('not-found')
+        else if (err.message === 'server-error') setError('server-error')
+        else setError('network')
+      })
   }, [params.token])
 
   useEffect(() => {
-    function handler(event) {
+    function pongHandler(event) {
       if (event.data?.type === 'PONG' && event.data?.source === 'nikkel-extension') {
         setExtensionDetected(true)
       }
     }
-    window.addEventListener('message', handler)
+    window.addEventListener('message', pongHandler)
     window.postMessage({ type: 'PING' }, '*')
-    const timer = setTimeout(() => window.removeEventListener('message', handler), 1000)
+    const timer = setTimeout(() => window.removeEventListener('message', pongHandler), 1000)
     return () => {
-      window.removeEventListener('message', handler)
+      window.removeEventListener('message', pongHandler)
       clearTimeout(timer)
     }
   }, [])
 
-  if (error) {
+  useEffect(() => {
+    function resultHandler(event) {
+      if (event.data?.type === 'LOAD_REVIEW_RESULT') {
+        setOpening(false)
+        if (!event.data?.payload?.ok) {
+          setOpeningError(event.data?.payload?.error || 'Failed to open review')
+        }
+      }
+    }
+    window.addEventListener('message', resultHandler)
+    return () => {
+      window.removeEventListener('message', resultHandler)
+      if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current)
+    }
+  }, [])
+
+  const handleOpen = useCallback(() => {
+    setOpening(true)
+    setOpeningError(null)
+    window.postMessage({ action: 'LOAD_REVIEW', reviewToken: params.token }, '*')
+    if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current)
+    openTimeoutRef.current = setTimeout(() => setOpening(s => { if (s) return false }), 10000)
+  }, [params.token])
+
+  if (error === 'not-found') {
     return (
-      <div style={{ textAlign: 'center', marginTop: 80, color: '#f87171', fontFamily: 'inherit' }}>
-        <h2 style={{ fontSize: 22, fontWeight: 600 }}>Review not found</h2>
-        <p style={{ color: '#64748b', fontSize: 14 }}>This link may be invalid or the review was removed.</p>
-      </div>
+      <PageShell>
+        <Icon>🔗</Icon>
+        <Title>Review not found</Title>
+        <Text>This link may be invalid or the review was removed.</Text>
+      </PageShell>
+    )
+  }
+
+  if (error === 'server-error') {
+    return (
+      <PageShell>
+        <Icon>⚠️</Icon>
+        <Title>Something went wrong</Title>
+        <Text>The server encountered an error. Please try again later.</Text>
+      </PageShell>
+    )
+  }
+
+  if (error === 'network') {
+    return (
+      <PageShell>
+        <Icon>🌐</Icon>
+        <Title>Connection error</Title>
+        <Text>Could not reach the server. Check your internet connection and try again.</Text>
+      </PageShell>
     )
   }
 
   if (!data) {
     return (
-      <div style={{ textAlign: 'center', marginTop: 80, color: '#94a3b8', fontFamily: 'inherit' }}>
-        <h2 style={{ fontSize: 22, fontWeight: 600 }}>Loading review...</h2>
-      </div>
+      <PageShell>
+        <Spinner />
+        <Title>Loading review...</Title>
+        <Text style={{ color: '#64748b' }}>Fetching review details</Text>
+      </PageShell>
     )
   }
 
@@ -59,6 +115,7 @@ export default function ReviewPage({ params }) {
   const ownerDisplay = review.owner_id
     ? review.owner_id.slice(0, 8) + '...'
     : 'Anonymous'
+  const pageUrl = project.url || project.base_url || ''
 
   return (
     <div style={{
@@ -82,10 +139,12 @@ export default function ReviewPage({ params }) {
         <div style={{ marginBottom: 24, textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>📌</div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>{project.name || project.title || 'Untitled Review'}</h1>
-          <a href={project.url || project.base_url} target="_blank" rel="noopener noreferrer"
-            style={{ color: '#6366f1', fontSize: 13, textDecoration: 'none' }}>
-            {project.url || project.base_url || ''}
-          </a>
+          {pageUrl && (
+            <a href={pageUrl} target="_blank" rel="noopener noreferrer"
+              style={{ color: '#6366f1', fontSize: 13, textDecoration: 'none' }}>
+              {pageUrl}
+            </a>
+          )}
         </div>
 
         <div style={{
@@ -99,58 +158,110 @@ export default function ReviewPage({ params }) {
           <StatRow label="Created" value={created} />
         </div>
 
+        {opening && (
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <Spinner size={18} />
+            <p style={{ color: '#94a3b8', fontSize: 13, margin: '8px 0 0' }}>Opening review...</p>
+          </div>
+        )}
+
+        {openingError && (
+          <p style={{ color: '#f87171', fontSize: 13, textAlign: 'center', margin: '0 0 12px' }}>{openingError}</p>
+        )}
+
         {extensionDetected ? (
-          <a href={`/board/${params.token}`}
-            onClick={e => {
-              window.postMessage({ action: 'LOAD_REVIEW', reviewToken: params.token }, '*');
-            }}
+          <button
+            onClick={handleOpen}
+            disabled={opening}
             style={{
               display: 'block',
+              width: '100%',
               textAlign: 'center',
-              background: '#6366f1',
+              background: opening ? '#4f46e5' : '#6366f1',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               padding: '12px 24px',
               fontSize: 15,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: opening ? 'default' : 'pointer',
               textDecoration: 'none',
-              transition: 'background 0.15s'
+              transition: 'background 0.15s',
+              opacity: opening ? 0.7 : 1
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#4f46e5'}
-            onMouseLeave={e => e.currentTarget.style.background = '#6366f1'}
           >
-            Open Review
-          </a>
+            {opening ? 'Opening...' : 'Open Review'}
+          </button>
         ) : (
           <div style={{ textAlign: 'center' }}>
-            <a href="#"
-              onClick={e => e.preventDefault()}
-              style={{
-                display: 'block',
-                textAlign: 'center',
-                background: '#334155',
-                color: '#64748b',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: 'not-allowed',
-                textDecoration: 'none',
-                marginBottom: 12
-              }}
-            >
+            <div style={{
+              background: '#334155',
+              color: '#64748b',
+              borderRadius: 8,
+              padding: '12px 24px',
+              fontSize: 15,
+              fontWeight: 600,
+              marginBottom: 12,
+              cursor: 'not-allowed'
+            }}>
               Open Review
-            </a>
+            </div>
             <p style={{ color: '#94a3b8', fontSize: 12, margin: 0 }}>
-              Install the Nikkel extension to open this review.
+              Install the Nikkel extension to open this review.{' '}
+              <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer"
+                style={{ color: '#6366f1', textDecoration: 'none' }}>
+                Get it here
+              </a>.
             </p>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+function PageShell({ children }) {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#0f172a',
+      color: '#e2e8f0',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      gap: 8
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function Icon({ children }) {
+  return <div style={{ fontSize: 36, marginBottom: 8 }}>{children}</div>
+}
+
+function Title({ children }) {
+  return <h2 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{children}</h2>
+}
+
+function Text({ children, style }) {
+  return <p style={{ color: '#94a3b8', fontSize: 14, margin: 0, textAlign: 'center', ...style }}>{children}</p>
+}
+
+function Spinner({ size }) {
+  return (
+    <div style={{
+      width: size || 24,
+      height: size || 24,
+      border: '2px solid #334155',
+      borderTopColor: '#6366f1',
+      borderRadius: '50%',
+      animation: 'nikkel-spin 0.6s linear infinite',
+      marginBottom: 8
+    }} />
   )
 }
 

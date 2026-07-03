@@ -1,5 +1,6 @@
 export const SUPABASE_URL = 'https://ptyogubndwyanjaenmzy.supabase.co';
 export const SUPABASE_ANON = 'sb_publishable_rIIjNoFOiD5H7qhJMUPO3Q_Sjr9rsdl';
+export const VIEWER_BASE = 'http://localhost:3000';
 
 let _token = null;
 let _refreshToken = null;
@@ -149,6 +150,11 @@ export async function getReviewNikkels(reviewId, pageUrl, token) {
   }));
 }
 
+export async function getProjectReviews(projectId, token) {
+  const data = await supabaseFetch(`/rest/v1/reviews?project_id=eq.${projectId}&order=created_at.desc&limit=1`, { token });
+  return Array.isArray(data) ? data : [];
+}
+
 export async function createReview(projectId, userId, token) {
   const data = await supabaseFetch('/rest/v1/reviews', {
     method: 'POST',
@@ -157,6 +163,12 @@ export async function createReview(projectId, userId, token) {
     body: JSON.stringify({ project_id: projectId, owner_id: userId }),
   });
   return Array.isArray(data) ? data[0] : data;
+}
+
+export async function getReviewByShareToken(shareToken) {
+  const data = await supabaseFetch(`/rest/v1/reviews?share_token=eq.${shareToken}&select=*,project:project_id(*)`);
+  const rows = Array.isArray(data) ? data : [];
+  return rows.length > 0 ? rows[0] : null;
 }
 
 export async function ensureShareToken(reviewId, token) {
