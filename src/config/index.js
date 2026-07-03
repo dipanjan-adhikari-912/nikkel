@@ -3,7 +3,7 @@
 //   API_URL           — required; Railway API endpoint
 //   CHROME_STORE_URL  — optional; set when published to Chrome Web Store
 
-const VIEWER = 'https://nikkel-fxy5d11l0-dipanjancan1-2926s-projects.vercel.app';
+const VIEWER = 'https://nikkel-wheat.vercel.app';
 const API = 'https://attractive-imagination-production-eb6b.up.railway.app';
 
 function must(name, raw) {
