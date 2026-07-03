@@ -137,6 +137,22 @@ const POPOVER_HTML = `
     #nvEl { color: #94a3b8; font-size: 11px; margin-bottom: 6px; }
     #nvComment { color: #e2e8f0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
     #nvMeta { color: #64748b; font-size: 11px; margin-top: 6px; }
+    #comments { border-top: 1px solid #1e293b; margin-top: 8px; padding-top: 6px; }
+    #commentsTitle { color: #94a3b8; font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+    #commentsList { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow-y: auto; }
+    #commentsList li { padding: 4px 0; border-bottom: 1px solid #0f172a; }
+    #commentsList li:last-child { border-bottom: none; }
+    .cmtAuthor { color: #6366f1; font-size: 11px; font-weight: 500; }
+    .cmtText { color: #e2e8f0; font-size: 12px; line-height: 1.4; margin: 1px 0; }
+    .cmtTime { color: #64748b; font-size: 10px; }
+    #commentsLoading { color: #64748b; font-size: 11px; text-align: center; padding: 8px 0; }
+    #commentsEmpty { color: #64748b; font-size: 11px; text-align: center; padding: 8px 0; }
+    #commentInput { display: flex; gap: 6px; margin-top: 6px; }
+    #commentInputField { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 4px; color: #e2e8f0; font-size: 12px; padding: 6px 8px; outline: none; box-sizing: border-box; }
+    #commentInputField:focus { border-color: #6366f1; }
+    #commentSubmit { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 6px 10px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    #commentSubmit:disabled { opacity: .5; cursor: default; }
+    #commentError { color: #f87171; font-size: 11px; margin-top: 4px; display: none; }
   </style>
   <div id="popover">
     <div id="nvHead">
@@ -146,6 +162,17 @@ const POPOVER_HTML = `
     <div id="nvEl"></div>
     <div id="nvComment"></div>
     <div id="nvMeta"></div>
+    <div id="comments">
+      <div id="commentsTitle">Comments</div>
+      <div id="commentsLoading">Loading comments…</div>
+      <div id="commentsEmpty" style="display:none">No comments yet.</div>
+      <ul id="commentsList"></ul>
+      <div id="commentInput">
+        <input id="commentInputField" type="text" placeholder="Add a comment…" />
+        <button id="commentSubmit">Send</button>
+      </div>
+      <div id="commentError"></div>
+    </div>
   </div>
 `;
 
@@ -172,6 +199,8 @@ let savedPaddingBottom = '';
 let isPinsVisible = true;
 let commentResolve = null;
 let currentSessionId = null;
+let currentReviewId = null;
+let readOnly = false;
 let pollInterval = null;
 
 const NIKKEL_SKIP_SELECTORS = '#nikkel-bar-host, #nikkel-comment-host, #nikkel-popover-host, #nikkel-pins';
@@ -228,7 +257,7 @@ function startPolling() {
   stopPolling();
   if (!currentSessionId) return;
   pollInterval = setInterval(() => {
-    bgMsg({ type: 'GET_NIKKELS', payload: { sessionId: currentSessionId } }, (res) => {
+    bgMsg({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (res) => {
       if (res?.ok && res.nikkels) {
         res.nikkels.forEach((n) => {
           if (!pins.find((p) => p.id === n.id)) addPin(n);
@@ -245,13 +274,15 @@ function stopPolling() {
   }
 }
 
-function injectBar(projectName, sessionId, shareUrl, initialMode) {
+function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly) {
   if (barHost) {
     console.log('[Nikkel] injectBar: barHost already exists, skipping');
     return;
   }
-  console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode });
+  console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly });
   currentSessionId = sessionId || null;
+  currentReviewId = reviewId || null;
+  readOnly = isReadOnly || false;
   barHost = createShadowHost('nikkel-bar-host');
   const shadow = barHost.attachShadow({ mode: 'open' });
   shadow.innerHTML = BAR_HTML;
@@ -300,6 +331,10 @@ function injectBar(projectName, sessionId, shareUrl, initialMode) {
   if (modeDd) {
     modeDd.addEventListener('change', () => {
       const mode = modeDd.value;
+      if (readOnly && mode === 'annotate') {
+        modeDd.value = 'browse';
+        return;
+      }
       setMode(mode);
       bgMsg({ type: 'MODE_CHANGED', payload: { mode } });
     });
@@ -317,7 +352,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode) {
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
       if (!currentSessionId) return;
-      bgMsg({ type: 'GET_NIKKELS', payload: { sessionId: currentSessionId } }, (res) => {
+      bgMsg({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (res) => {
         if (res?.ok && res.nikkels) {
           removeAllPins();
           res.nikkels.forEach((n) => addPin(n));
@@ -358,31 +393,44 @@ function injectBar(projectName, sessionId, shareUrl, initialMode) {
     shareGoogleBtn.addEventListener('click', async () => {
       shareGoogleBtn.disabled = true;
       shareGoogleBtn.textContent = 'Connecting…';
-      bgMsg({ type: 'SIGN_IN_GOOGLE' }, (res) => {
-        if (res?.ok) {
-          if (shareUrlSection && shareAuthSection) {
-            shareUrlSection.style.display = '';
-            shareAuthSection.style.display = 'none';
-          }
-          if (shareUrlTxt) shareUrlTxt.value = res.shareUrl || 'https://nikkel.app/s/connected';
-          if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
-          if (copyBtn) {
-            try { navigator.clipboard.writeText(shareUrlTxt.value); } catch {}
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
-          }
-        } else {
-          shareGoogleBtn.disabled = false;
-          shareGoogleBtn.textContent = 'Continue with Google';
+
+      const showUrl = (url) => {
+        if (shareUrlSection && shareAuthSection) {
+          shareUrlSection.style.display = '';
+          shareAuthSection.style.display = 'none';
         }
-      });
+        if (shareUrlTxt) shareUrlTxt.value = url;
+        if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
+        if (copyBtn) {
+          try { navigator.clipboard.writeText(url); } catch {}
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
+        }
+      };
+
+      const showError = (msg) => {
+        shareGoogleBtn.disabled = false;
+        shareGoogleBtn.textContent = 'Continue with Google';
+        if (shareMeta) shareMeta.textContent = msg;
+      };
+
+      // Step 1: try SHARE — sets pendingShare if anonymous
+      const shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' });
+      if (shareRes?.ok && shareRes.shareUrl) return showUrl(shareRes.shareUrl);
+      if (!shareRes?.ok) return showError(shareRes?.error || 'Failed to create share link.');
+
+      // needsAuth was returned — authenticate, background will create review via pendingShare
+      const authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' });
+      if (authRes?.ok && authRes.shareUrl) return showUrl(authRes.shareUrl);
+      showError(authRes?.ok ? 'Signed in. Click Share again to generate a link.' : (authRes?.error || 'Google sign-in failed.'));
     });
   }
 
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      setMode('idle');
-      bgMsg({ type: 'MODE_CHANGED', payload: { mode: 'idle' } });
+      const mode = readOnly ? 'browse' : 'idle';
+      setMode(mode);
+      bgMsg({ type: 'MODE_CHANGED', payload: { mode } });
     });
   }
 
@@ -410,6 +458,8 @@ function removeBar() {
   pins = [];
   pinCounter = 0;
   currentSessionId = null;
+  currentReviewId = null;
+  readOnly = false;
   document.body.style.paddingBottom = savedPaddingBottom;
   document.getElementById('nikkel-cursor')?.remove();
   currentMode = 'idle';
@@ -428,12 +478,15 @@ function injectCommentBubble(pageX, pageY, elementInfo) {
 
   if (cbEl) cbEl.textContent = `<${elementInfo.tag}> ${elementInfo.elementText || ''}`;
 
-  let x = pageX;
-  let y = pageY;
+  // Position bubble near the pin (pin center is at pageX, pageY; pin radius = 13)
+  const pinRadius = 13;
+  const margin = 8;
+  let x = pageX + pinRadius + margin;
+  let y = pageY - pinRadius;
   const bw = 284;
   const bh = 140;
-  if (x + bw + 10 > window.innerWidth) x = window.innerWidth - bw - 10;
-  if (y + bh + 60 > window.innerHeight) y = window.innerHeight - bh - 60;
+  if (x + bw + 10 > window.innerWidth) x = pageX - pinRadius - margin - bw;
+  if (y + bh + 10 > window.innerHeight) y = window.innerHeight - bh - 10;
   if (x < 10) x = 10;
   if (y < 10) y = 10;
   commentHost.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647`;
@@ -516,6 +569,86 @@ function injectPopover(pageX, pageY, nikkel) {
   popoverHost.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647`;
 
   if (nvClose) nvClose.addEventListener('click', removePopover);
+
+  loadNikkelComments(nikkel);
+}
+
+function loadNikkelComments(nikkel) {
+  const shadow = popoverHost?.shadowRoot;
+  if (!shadow) return;
+  const list = qs(shadow, 'commentsList');
+  const loading = qs(shadow, 'commentsLoading');
+  const empty = qs(shadow, 'commentsEmpty');
+  const input = qs(shadow, 'commentInputField');
+  const submit = qs(shadow, 'commentSubmit');
+  const errEl = qs(shadow, 'commentError');
+  if (!list || !loading || !empty || !input || !submit || !errEl) return;
+
+  let comments = [];
+
+  const render = () => {
+    loading.style.display = 'none';
+    if (comments.length > 0) {
+      comments.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      list.innerHTML = comments.map((c) => `
+        <li data-cmid="${escHtml(c.id || c._temp || '')}">
+          <div class="cmtAuthor">${escHtml(c.author_name || 'Anonymous')}</div>
+          <div class="cmtText">${escHtml(c.body)}</div>
+          <div class="cmtTime">${c.created_at ? new Date(c.created_at).toLocaleString() : 'Just now'}</div>
+        </li>
+      `).join('');
+      empty.style.display = 'none';
+    } else {
+      list.innerHTML = '';
+      empty.style.display = '';
+    }
+  };
+
+  loading.style.display = '';
+  empty.style.display = 'none';
+  list.innerHTML = '';
+
+  chrome.runtime.sendMessage({ type: 'GET_NIKKEL_COMMENTS', payload: { nikkelId: nikkel.id } }, (res) => {
+    comments = (res?.ok ? res.comments || [] : []);
+    render();
+  });
+
+  const handleSubmit = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    submit.disabled = true;
+    errEl.style.display = 'none';
+
+    const temp = { id: null, _temp: `tmp-${Date.now()}`, author_name: 'You', text, created_at: null };
+    comments.push(temp);
+    render();
+    input.value = '';
+
+    chrome.runtime.sendMessage({ type: 'SUBMIT_COMMENT', payload: { nikkelId: nikkel.id, text } }, (res2) => {
+      submit.disabled = false;
+      if (res2?.ok && res2.comment) {
+        const idx = comments.findIndex((c) => c._temp === temp._temp);
+        if (idx !== -1) {
+          comments[idx] = res2.comment;
+          render();
+        }
+      } else {
+        comments = comments.filter((c) => c._temp !== temp._temp);
+        render();
+        errEl.textContent = res2?.error || 'Failed to post comment.';
+        errEl.style.display = '';
+      }
+    });
+  };
+
+  submit.onclick = handleSubmit;
+  input.onkeydown = (e) => { if (e.key === 'Enter') handleSubmit(); };
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 function removePopover() {
@@ -528,7 +661,7 @@ function removePopover() {
 function addPin(nikkel) {
   if (!pinsContainer) return;
   pinCounter++;
-  const idx = nikkel.idx || pinCounter;
+  const idx = nikkel.idx ?? pinCounter;
   const pin = document.createElement('div');
   pin.dataset.idx = idx;
   pin.dataset.sessionId = nikkel.sessionId || '';
@@ -632,13 +765,17 @@ async function handleDocumentClick(e) {
   if (commentHost) return;
   const target = e.target;
   if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) return;
-  if (target.closest('a')) e.preventDefault();
+  if (target.closest('a, button, input, select, textarea, [role="button"], [onclick]')) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
 
   const info = getElementInfo(target);
   const pageX = Math.round(e.clientX + window.scrollX);
   const pageY = Math.round(e.clientY + window.scrollY);
 
-  const result = await injectCommentBubble(e.clientX, e.clientY, info);
+  const result = await injectCommentBubble(pageX, pageY, info);
   if (!result) return;
 
   const nikkel = {
@@ -655,7 +792,9 @@ async function handleDocumentClick(e) {
   };
 
   console.log('[Nikkel] submitting nikkel', nikkel);
-  bgMsg({ type: 'SUBMIT_NIKKEL', payload: { nikkel } });
+  bgMsg({ type: 'SUBMIT_NIKKEL', payload: { nikkel } }, (res) => {
+    if (!res?.ok) console.error('[Nikkel] Submit failed:', res.error);
+  });
 }
 
 function handleKeydown(e) {
@@ -722,7 +861,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     console.log('[Nikkel] received message', msg.type);
     switch (msg.type) {
       case 'ACTIVATE': {
-        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, 'annotate');
+        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.mode || 'annotate', msg.payload.reviewId, msg.payload.readOnly);
+        loadPinsForReview();
         return { ok: true };
       }
       case 'DEACTIVATE': {
@@ -737,7 +877,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, url: location.href, title: document.title };
       }
       case 'LOAD_SESSION': {
-        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate');
+        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate', msg.payload.reviewId, msg.payload.viewOnly);
         removeAllPins();
         for (const n of msg.payload.nikkels) {
           addPin(n);
@@ -756,25 +896,49 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
+function setBadgeText(text) {
+  const host = document.getElementById('nikkel-bar-host');
+  if (!host) return;
+  const shadow = host.shadowRoot;
+  if (!shadow) return;
+  const el = qs(shadow, 'pinsBadge');
+  if (el) el.textContent = text;
+}
+
+function loadPinsForReview() {
+  if (!currentSessionId) return;
+  setBadgeText('...');
+  chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (nres) => {
+    if (nres?.ok && nres.nikkels) {
+      removeAllPins();
+      nres.nikkels.forEach((n) => addPin(n));
+    }
+    updateBadge();
+  });
+}
+
+function onPageReady(fn) {
+  if (document.readyState === 'complete') {
+    fn();
+  } else {
+    window.addEventListener('load', fn, { once: true });
+  }
+}
+
 function resumeActiveReview() {
   chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
     if (res?.ok && res.project) {
-      if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate');
-      chrome.runtime.sendMessage({ type: 'GET_NIKKELS' }, (nres) => {
-        if (nres?.ok && nres.nikkels) {
-          const currentUrl = location.href;
-          const relevant = nres.nikkels.filter((n) => n.pageUrl === currentUrl);
-          removeAllPins();
-          relevant.forEach((n) => addPin(n));
-        }
-      });
+      if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly);
+      onPageReady(loadPinsForReview);
     }
   });
 }
 
-resumeActiveReview();
+onPageReady(() => {
+  resumeActiveReview();
+});
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') resumeActiveReview();
+  if (document.visibilityState === 'visible') onPageReady(resumeActiveReview);
 });
 
 let lastUrl = location.href;
@@ -787,4 +951,40 @@ function checkUrlChange() {
 window.addEventListener('popstate', checkUrlChange);
 window.addEventListener('hashchange', checkUrlChange);
 setInterval(checkUrlChange, 1000);
+
+window.addEventListener('message', (event) => {
+  if (event.data?.type === 'PING') {
+    window.postMessage({ type: 'PONG', source: 'nikkel-extension' }, '*');
+  }
+  if (event.data?.type === 'NIKKEL_PING') {
+    window.postMessage({ type: 'NIKKEL_AVAILABLE', source: 'nikkel-extension' }, '*');
+  }
+  if (event.data?.type === 'OPEN_PROJECT') {
+    const { shareId } = event.data?.payload || {};
+    if (shareId) {
+      chrome.runtime.sendMessage(
+        { type: 'OPEN_PROJECT', payload: { shareId } },
+        (res) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
+            return;
+          }
+          window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: res || { ok: false, error: 'No response' } }, '*');
+        }
+      );
+    }
+  }
+  if (event.data?.action === 'LOAD_REVIEW') {
+    chrome.runtime.sendMessage(
+      { type: 'LOAD_REVIEW', payload: { reviewToken: event.data.reviewToken } },
+      (res) => {
+        if (chrome.runtime.lastError) {
+          window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
+          return;
+        }
+        window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: res || { ok: false, error: 'No response from extension' } }, '*');
+      }
+    );
+  }
+});
 })();

@@ -134,7 +134,7 @@ router.post('/forgot-password', async (req, res) => {
     }
 
     const { error } = await db.auth.resetPasswordForEmail(email, {
-      redirectTo: `${req.headers.origin || 'http://localhost:3000'}/dashboard?reset=true`
+      redirectTo: `${req.headers.origin}/dashboard?reset=true`
     })
 
     if (error) {

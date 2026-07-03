@@ -1,5 +1,10 @@
+// D E P R E C A T E D — this file is no longer imported.
+// Extension config lives in src/config/index.js.
+// Debug endpoints are in debug.js (inline constants).
+
 export const SUPABASE_URL = 'https://ptyogubndwyanjaenmzy.supabase.co';
 export const SUPABASE_ANON = 'sb_publishable_rIIjNoFOiD5H7qhJMUPO3Q_Sjr9rsdl';
+export const VIEWER_BASE = '';
 
 let _token = null;
 let _refreshToken = null;
@@ -114,9 +119,10 @@ export async function submitNikkel(data, token) {
     body: JSON.stringify(data),
   });
   const row = Array.isArray(result) ? result[0] : result;
+  if (!row) throw new Error('Empty response from Supabase insert');
   return {
     id: row.id,
-    projectId: row.project_id,
+    reviewId: row.review_id,
     pageUrl: row.page_url,
     pageX: row.x,
     pageY: row.y,
@@ -129,13 +135,13 @@ export async function submitNikkel(data, token) {
   };
 }
 
-export async function getProjectNikkels(projectId, pageUrl, token) {
-  let path = `/rest/v1/nikkels?project_id=eq.${projectId}&order=idx.asc`;
+export async function getReviewNikkels(reviewId, pageUrl, token) {
+  let path = `/rest/v1/nikkels?review_id=eq.${reviewId}&order=idx.asc`;
   if (pageUrl) path += `&page_url=eq.${encodeURIComponent(pageUrl)}`;
   const rows = await supabaseFetch(path, { token });
   return (rows || []).map(r => ({
     id: r.id,
-    projectId: r.project_id,
+    reviewId: r.review_id,
     pageUrl: r.page_url,
     pageX: r.x,
     pageY: r.y,
@@ -146,4 +152,42 @@ export async function getProjectNikkels(projectId, pageUrl, token) {
     idx: r.idx,
     userId: r.owner_id,
   }));
+}
+
+export async function getProjectReviews(projectId, token) {
+  const data = await supabaseFetch(`/rest/v1/reviews?project_id=eq.${projectId}&order=created_at.desc&limit=1`, { token });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createReview(projectId, userId, token) {
+  const data = await supabaseFetch('/rest/v1/reviews', {
+    method: 'POST',
+    token,
+    prefer: 'return=representation',
+    body: JSON.stringify({ project_id: projectId, owner_id: userId }),
+  });
+  return Array.isArray(data) ? data[0] : data;
+}
+
+export async function getReviewByShareToken(shareToken) {
+  const data = await supabaseFetch(`/rest/v1/reviews?share_token=eq.${shareToken}&select=*,project:project_id(*)`);
+  const rows = Array.isArray(data) ? data : [];
+  return rows.length > 0 ? rows[0] : null;
+}
+
+export async function ensureShareToken(reviewId, token) {
+  const data = await supabaseFetch(`/rest/v1/reviews?id=eq.${reviewId}&select=share_token`, { token });
+  const review = Array.isArray(data) ? data[0] : data;
+  if (review?.share_token) return review.share_token;
+
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const shareToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  await supabaseFetch(`/rest/v1/reviews?id=eq.${reviewId}`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify({ share_token: shareToken }),
+  });
+  return shareToken;
 }

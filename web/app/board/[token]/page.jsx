@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useRef } from 'react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const _RAW = process.env.NEXT_PUBLIC_API_URL
+if (!_RAW) {
+  throw new Error('NEXT_PUBLIC_API_URL is not configured. Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.')
+}
+const API_BASE = _RAW.replace(/\/+$/, '')
 
 export default function BoardPage({ params }) {
   const [project, setProject] = useState(null)
@@ -211,7 +215,7 @@ function CommentBubble({ nikkel, onClose, onSubmit, replyText, setReplyText, rep
             <div key={r.id} style={{ marginBottom: 8, fontSize: 13 }}>
               <strong>{r.author_name}</strong>
               {r.is_client && <span style={{ marginLeft: 4, fontSize: 10, padding: '1px 4px', borderRadius: 3, background: '#dbeafe', color: '#1e40af' }}>Client</span>}
-              <p style={{ margin: '2px 0 0', color: '#374151' }}>{r.text}</p>
+              <p style={{ margin: '2px 0 0', color: '#374151' }}>{r.body}</p>
               <p style={{ margin: 0, fontSize: 11, color: '#9ca3af' }}>{new Date(r.created_at).toLocaleDateString()}</p>
             </div>
           ))}

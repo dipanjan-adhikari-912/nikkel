@@ -6,6 +6,14 @@
   - `manifest.json`, `background.js`, `content.js`, `popup.js`, `popup.html`, `api.js`
   - `debug.html`/`debug.js` — endpoint tester (open via `chrome.runtime.getURL('debug.html')`)
   - `schema.sql` — Supabase DDL (drop and recreate to reset)
+- `src/` — service-oriented architecture layer (services, repos, DI)
+  - `di/index.js` — DI container (wires client → repos → services)
+  - `services/` — `AuthService`, `ProjectService`, `PinService`, `ShareService`, `ReviewService`
+  - `repositories/` — `SupabaseProjectRepository`, `SupabasePinRepository`, `SupabaseUserRepository`
+  - `infrastructure/supabase/` — `SupabaseClient` (HTTP wrapper, token refresh)
+  - `domain/` — models (`User`, `Project`, `Pin`, `Review`, `ShareLink`), interfaces (repository contracts)
+  - `mappers/` — `ProjectMapper`, `PinMapper`, `UserMapper` (DB ↔ Domain conversion)
+  - `config/index.js` — shared constants (e.g. `VIEWER_BASE`)
 - `extension/` — stale organized copy of a past version, **not used by Chrome**
 - `api/` — Node.js Express backend (separate project)
 - `web/` — Next.js frontend (separate project)
@@ -16,8 +24,9 @@
 - **MV3** — service worker (`background.js`), no background page
 - **Anonymous-first onboarding** — no email/password. "Start Review" creates an anonymous Supabase user + project automatically
 - **Google OAuth** via `chrome.identity.launchWebAuthFlow` → Supabase `/auth/v1/authorize?provider=google`. Redirect URL must be `https://{EXTENSION_ID}.chromiumapp.org/`
-- **Supabase REST API** (not SDK) — all fetches go through `api.js` -> `supabaseFetch()`. Uses `fetch` directly, not `@supabase/supabase-js`
-- **Token refresh** — `supabaseFetch()` auto-refreshes JWT on 401 via `/auth/v1/token?grant_type=refresh_token`
+- **Supabase REST API** (not SDK) — all fetches use `fetch` directly, wrapped by `SupabaseClient` in `src/`. Legacy `api.js` still exists with `supabaseFetch()` for `debug.js`.
+- **Token refresh** — `SupabaseClient.request()` auto-refreshes JWT on 401 via `/auth/v1/token?grant_type=refresh_token`
+- **Service-oriented architecture** — `background.js` depends on `src/di/index.js` (DI container) → services → repositories → `SupabaseClient`
 - **Per-tab state** — background has `globalState` (auth) + `tabState` Map keyed by `tabId`. Each tab has its own `mode`, `project`, `pins`, `url`, `title`. No per-tab info is shared globally.
 - **Only one annotating tab at a time** — entering annotate mode on a tab exits annotate on all other tabs via `MODE_CHANGED` handler
 - **Pins filtered by projectId + pageUrl** — `getProjectNikkels()` now takes a `pageUrl` param. Supabase query includes `&page_url=eq.${url}`, so only page-specific pins are returned.
@@ -67,7 +76,7 @@
 
 ## Database schema (`schema.sql`)
 
-Two tables: `projects` and `nikkels`. RLS policies — anonymous users can create projects and nikkels.
+Three tables: `projects`, `reviews`, `nikkels`. RLS policies — anonymous users can create projects, reviews, and nikkels.
 
 Key columns:
 - `projects`: `owner_id` (not null, default `auth.uid()`), `title`, `base_url`

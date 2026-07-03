@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const _RAW_API_URL = process.env.NEXT_PUBLIC_API_URL
+if (!_RAW_API_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL is not configured. Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.')
+}
+const API_BASE = _RAW_API_URL.replace(/\/+$/, '')
 
 const btn = {
   width: '100%', padding: '10px 16px', border: 'none', borderRadius: 8,

@@ -3,9 +3,13 @@ const SUPABASE_ANON = 'sb_publishable_rIIjNoFOiD5H7qhJMUPO3Q_Sjr9rsdl';
 
 document.getElementById('dbUrl').textContent = SUPABASE_URL;
 document.getElementById('dbKey').textContent = SUPABASE_ANON.slice(0, 24) + '…';
+const extId = location.hostname;
+document.getElementById('extId').textContent = extId;
+document.getElementById('redirectUri').textContent = `https://${extId}.chromiumapp.org/`;
 
 let token = null;
 let projectId = null;
+let reviewId = null;
 let passCount = 0, failCount = 0;
 
 async function sfetch(path, opts = {}) {
@@ -56,6 +60,40 @@ const tests = {
     token = data.access_token;
     log('ok', 'anonSignIn', { user: data.user.id, is_anonymous: data.user.is_anonymous });
   },
+  async checkGoogleOAuth() {
+    // Get extension ID from the page URL (chrome-extension://{ID}/debug.html)
+    const extId = location.hostname;
+    const redirectUrl = `https://${extId}.chromiumapp.org/`;
+    const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
+    
+    // Test by fetching the authorize endpoint (no user interaction)
+    const res = await fetch(oauthUrl, { method: 'GET', redirect: 'manual', credentials: 'omit' });
+    
+    if (res.status === 404) {
+      throw new Error('Google provider not configured in Supabase (404 on /authorize)');
+    }
+    if (res.status === 400) {
+      const text = await res.text();
+      if (text.includes('invalid_client') || text.includes('OAuth client was not found')) {
+        throw new Error('Google OAuth client not found - check Client ID/Secret in Supabase');
+      }
+    }
+    if (res.status === 302 || res.status === 200) {
+      // Check if redirect URL contains Google
+      const location = res.headers.get('location') || '';
+      if (location.includes('accounts.google.com') || location.includes('oauth2')) {
+        log('ok', 'checkGoogleOAuth', { redirectUrl, googleRedirect: true, status: res.status });
+        return;
+      }
+      // If it redirects to Supabase login page, Google is configured but might need credentials
+      if (location.includes('supabase') || location.includes('/auth/v1/authorize')) {
+        log('ok', 'checkGoogleOAuth', { redirectUrl, googleRedirect: false, status: res.status, note: 'Google provider configured - check Client ID/Secret if auth fails' });
+        return;
+      }
+    }
+    // Other status
+    log('ok', 'checkGoogleOAuth', { redirectUrl, status: res.status, note: 'Check Supabase Google provider settings' });
+  },
   async getProjects() {
     if (!token) throw new Error('Sign in first');
     const data = await sfetch('/rest/v1/projects?select=*&order=created_at.desc', { token });
@@ -71,22 +109,33 @@ const tests = {
     projectId = p.id;
     log('ok', 'createProject', { id: p.id, title: p.title, base_url: p.base_url });
   },
-  async submitNikkel() {
+  async createReview() {
     if (!token) throw new Error('Sign in first');
     if (!projectId) throw new Error('Create a project first');
-    const existing = await sfetch(`/rest/v1/nikkels?project_id=eq.${projectId}&select=id`, { token });
+    const data = await sfetch('/rest/v1/reviews', {
+      method: 'POST', token, prefer: 'return=representation',
+      body: JSON.stringify({ project_id: projectId }),
+    });
+    const r = Array.isArray(data) ? data[0] : data;
+    reviewId = r.id;
+    log('ok', 'createReview', { id: r.id, share_token: r.share_token });
+  },
+  async submitNikkel() {
+    if (!token) throw new Error('Sign in first');
+    if (!reviewId) throw new Error('Create a review first');
+    const existing = await sfetch(`/rest/v1/nikkels?review_id=eq.${reviewId}&select=id`, { token });
     const idx = (existing || []).length + 1;
     const data = await sfetch('/rest/v1/nikkels', {
       method: 'POST', token, prefer: 'return=representation',
-      body: JSON.stringify({ project_id: projectId, x: 400, y: 300, dom_selector: '.cta', tag: 'button', element_text: 'Click Me', comment: 'Debug pin ' + idx, idx }),
+      body: JSON.stringify({ review_id: reviewId, x: 400, y: 300, dom_selector: '.cta', tag: 'button', element_text: 'Click Me', comment: 'Debug pin ' + idx, idx }),
     });
     const n = Array.isArray(data) ? data[0] : data;
     log('ok', 'submitNikkel', { id: n.id, idx: n.idx, comment: n.comment });
   },
   async getNikkels() {
     if (!token) throw new Error('Sign in first');
-    if (!projectId) throw new Error('Create a project first');
-    const data = await sfetch(`/rest/v1/nikkels?project_id=eq.${projectId}&order=idx.asc`, { token });
+    if (!reviewId) throw new Error('Create a review first');
+    const data = await sfetch(`/rest/v1/nikkels?review_id=eq.${reviewId}&order=idx.asc`, { token });
     log('ok', 'getNikkels', { count: data.length, nikkels: data });
   },
 };
@@ -105,8 +154,10 @@ async function runTest(name) {
   if (btn) {
     btn.disabled = false;
     btn.textContent = name === 'anonSignIn' ? 'Anon Sign In' :
+      name === 'checkGoogleOAuth' ? 'Check Google OAuth Config' :
       name === 'getProjects' ? 'Get Projects' :
       name === 'createProject' ? 'Create Project' :
+      name === 'createReview' ? 'Create Review' :
       name === 'submitNikkel' ? 'Submit Nikkel' : 'Get Nikkels';
   }
 }
@@ -116,7 +167,7 @@ document.querySelectorAll('[data-test]').forEach(btn => {
 });
 
 document.getElementById('runAll').addEventListener('click', async () => {
-  const order = ['anonSignIn', 'getProjects', 'createProject', 'submitNikkel', 'getNikkels'];
+  const order = ['anonSignIn', 'checkGoogleOAuth', 'getProjects', 'createProject', 'createReview', 'submitNikkel', 'getNikkels'];
   disableAll(true);
   document.getElementById('runAll').innerHTML = '<span class="spinner"></span> Running…';
   for (const name of order) {

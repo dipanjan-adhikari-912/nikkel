@@ -1,3 +1,5 @@
+import './globals.css'
+
 export const metadata = {
   title: 'Nikkel',
   description: 'Website annotation and feedback platform',
@@ -6,10 +8,13 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{
-        margin: 0,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      }}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <style>{`@keyframes nikkel-spin{to{transform:rotate(360deg)}}`}</style>
+      </head>
+      <body>
         {children}
       </body>
     </html>
