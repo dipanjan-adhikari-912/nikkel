@@ -43,7 +43,7 @@ router.get('/:shareToken', async (req, res) => {
 
       const { data: nikkels, error: nikkelError } = await db
         .from('nikkels')
-        .select('*, replies(*)')
+        .select('*')
         .eq('review_id', fullReview.id)
         .order('created_at', { ascending: true })
 
@@ -54,7 +54,7 @@ router.get('/:shareToken', async (req, res) => {
 
     const { data: nikkels, error: nikkelError } = await db
       .from('nikkels')
-      .select('*, replies(*)')
+      .select('*')
       .eq('review_id', review.id)
       .order('created_at', { ascending: true })
 
@@ -68,12 +68,11 @@ router.get('/:shareToken', async (req, res) => {
 
 router.post('/:shareToken/reply', async (req, res) => {
   try {
-    const { nikkelId, authorName, authorEmail, text } = req.body
-    if (!nikkelId || !authorName || !text) {
+    const { nikkelId, authorName, authorEmail, text: body } = req.body
+    if (!nikkelId || !authorName || !body) {
       return res.status(400).json({ error: 'nikkelId, authorName, and text are required' })
     }
 
-    // Find review by share token
     const { data: review, error: reviewError } = await db
       .from('reviews')
       .select('id')
@@ -100,7 +99,7 @@ router.post('/:shareToken/reply', async (req, res) => {
         nikkel_id: nikkelId,
         author_name: authorName,
         author_email: authorEmail,
-        text,
+        body,
         is_client: true
       })
       .select()

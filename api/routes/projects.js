@@ -4,6 +4,58 @@ import { requireAuth } from '../middleware/auth.js'
 
 const router = Router()
 
+// Get project by share token (public, no auth required)
+router.get('/share/:shareId', async (req, res) => {
+  try {
+    const { data: project, error: projectError } = await db
+      .from('projects')
+      .select('*')
+      .eq('share_token', req.params.shareId)
+      .single()
+
+    if (projectError || !project) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+
+    const { data: reviews, error: reviewsError } = await db
+      .from('reviews')
+      .select('id')
+      .eq('project_id', project.id)
+
+    if (reviewsError) {
+      return res.status(500).json({ error: reviewsError.message })
+    }
+
+    const reviewIds = (reviews || []).map(r => r.id)
+    let pinCount = 0
+    let collaboratorIds = new Set()
+
+    if (reviewIds.length > 0) {
+      const { data: nikkels, error: nikkelError } = await db
+        .from('nikkels')
+        .select('id, owner_id')
+        .in('review_id', reviewIds)
+
+      if (!nikkelError && nikkels) {
+        pinCount = nikkels.length
+        nikkels.forEach(n => { if (n.owner_id) collaboratorIds.add(n.owner_id) })
+      }
+    }
+
+    res.json({
+      id: project.id,
+      name: project.title,
+      url: project.base_url,
+      shareToken: project.share_token,
+      collaboratorCount: collaboratorIds.size + 1,
+      pinCount,
+      commentCount: pinCount,
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { data, error } = await db

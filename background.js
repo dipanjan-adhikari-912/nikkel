@@ -1,6 +1,6 @@
 import { container } from './src/di/index.js';
-import { VIEWER_BASE } from './src/config/index.js';
-import { SUPABASE_URL } from './src/infrastructure/supabase/SupabaseClient.js';
+import { VIEWER_BASE, API_URL } from './src/config/index.js';
+import { SUPABASE_URL, SUPABASE_ANON } from './src/infrastructure/supabase/SupabaseClient.js';
 
 const { supabaseClient, authService, projectService, pinService, shareService } = container;
 
@@ -133,6 +133,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         const project = await projectService.create(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
         const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token);
+        if (!review) console.error('[BG] START_REVIEW: ensureProjectReview returned null — review not created');
         const tab = getTabState(tId);
         tab.project = project;
         tab.review = review;
@@ -199,7 +200,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, nikkels };
       }
 
+      case 'GET_NIKKEL_COMMENTS': {
+        const { nikkelId } = msg.payload || {};
+        if (!nikkelId) return { ok: true, comments: [] };
+        try {
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/replies?nikkel_id=eq.${nikkelId}&order=created_at.asc`, {
+            headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${globalState.token}` },
+          });
+          if (!res.ok) return { ok: true, comments: [] };
+          const data = await res.json();
+          return { ok: true, comments: data || [] };
+        } catch {
+          return { ok: true, comments: [] };
+        }
+      }
+
+      case 'SUBMIT_COMMENT': {
+        const { nikkelId, text } = msg.payload || {};
+        if (!nikkelId || !text) return { ok: false, error: 'Missing nikkelId or text' };
+        try {
+          const authorName = globalState.user?.user_metadata?.full_name || 'Anonymous';
+          const res = await fetch(`${API_URL}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nikkelId, text, authorName }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { ok: false, error: err.error || `HTTP ${res.status}` };
+          }
+          const comment = await res.json();
+          return { ok: true, comment };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
       case 'SIGN_IN_GOOGLE': {
+        console.log('[BG] SIGN_IN_GOOGLE — globalState.isAnonymous:', globalState.isAnonymous, 'globalState.user:', globalState.user?.id);
         const redirectUrl = chrome.identity.getRedirectURL();
         const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
         let redirect;
@@ -219,10 +257,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         globalState.token = accessToken;
         globalState.refreshToken = refreshToken;
         globalState.isAnonymous = false;
+        console.log('[BG] SIGN_IN_GOOGLE — after auth, pendingShare:', pendingShare, 'pendingShare?.tabId:', pendingShare?.tabId);
         if (pendingShare && pendingShare.tabId) {
           const ts = getTabState(pendingShare.tabId);
+          console.log('[BG] SIGN_IN_GOOGLE — pendingShare tabState project:', ts?.project?.id, 'review:', ts?.review?.id);
           if (ts.project) {
             let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
+            console.log('[BG] SIGN_IN_GOOGLE — ensureProjectReview returned:', review?.id);
             if (review) {
               ts.review = review;
               const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
@@ -231,8 +272,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               await saveState();
               return { ok: true, user: globalState.user, shareUrl };
             }
+            console.error('[BG] SIGN_IN_GOOGLE: ensureProjectReview returned null — review not created after Google auth');
           }
         }
+        console.log('[BG] SIGN_IN_GOOGLE — returning user only, no shareUrl (pendingShare was not set)');
         await saveState();
         return { ok: true, user: globalState.user };
       }
@@ -249,6 +292,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         }
         return { ok: true };
+      }
+
+      case 'OPEN_PROJECT': {
+        const srcTabId = sender.tab?.id || tabId;
+        if (!srcTabId) return { ok: false, error: 'No tab context' };
+        const { shareId } = msg.payload || {};
+        if (!shareId) return { ok: false, error: 'No shareId provided' };
+
+        const boardRes = await fetch(`${API_URL}/board/${encodeURIComponent(shareId)}`);
+        if (!boardRes.ok) return { ok: false, error: 'Project not found' };
+        const board = await boardRes.json();
+        const boardProject = board.project;
+        const review = board.review;
+
+        const targetUrl = (boardProject.base_url || boardProject.url || '').replace(/\/+$/, '');
+        if (!targetUrl) return { ok: false, error: 'Project has no target URL' };
+
+        const ts = getTabState(srcTabId);
+        ts.project = { id: boardProject.id, title: boardProject.title || boardProject.name, baseUrl: targetUrl, shareToken: boardProject.share_token };
+        ts.review = review ? { id: review.id, project_id: review.project_id, owner_id: review.owner_id, share_token: review.share_token } : null;
+        ts.nikkels = [];
+        ts.mode = 'browse';
+        ts.url = targetUrl;
+        ts.readOnly = true;
+        await saveState();
+
+        return { ok: true, targetUrl };
       }
 
       case 'MODE_CHANGED': {
@@ -354,6 +424,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
         if (!tab.project) return { ok: false, error: 'No active project' };
+        console.log('[BG] SHARE — isAnonymous:', globalState.isAnonymous, 'project:', tab.project.id, 'pendingShare:', pendingShare);
 
         if (globalState.isAnonymous) {
           pendingShare = { tabId: srcTabId };
@@ -362,7 +433,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
-        if (!review) return { ok: false, error: 'Failed to create review' };
+        if (!review) {
+          console.error('[BG] SHARE: ensureProjectReview returned null');
+          return { ok: false, error: 'Failed to create review' };
+        }
         tab.review = review;
 
         const shareToken = await shareService.ensureShareToken(review.id, globalState.token);

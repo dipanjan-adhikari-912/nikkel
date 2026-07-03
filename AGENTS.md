@@ -76,7 +76,7 @@
 
 ## Database schema (`schema.sql`)
 
-Two tables: `projects` and `nikkels`. RLS policies — anonymous users can create projects and nikkels.
+Three tables: `projects`, `reviews`, `nikkels`. RLS policies — anonymous users can create projects, reviews, and nikkels.
 
 Key columns:
 - `projects`: `owner_id` (not null, default `auth.uid()`), `title`, `base_url`

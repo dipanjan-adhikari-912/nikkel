@@ -106,6 +106,8 @@ function showShareUrl(url) {
 }
 
 function showActiveView(state) {
+  console.log('[Popup] showActiveView', { project: state.project?.id, user: state.user?.id, isAnonymous: state.isAnonymous, url: state.url, title: state.title });
+  console.log('[Popup] showActiveView check — !isAnonymous:', !state.isAnonymous, 'user truthy:', !!state.user, 'result:', !state.isAnonymous && state.user);
   showView('vActive');
   const p = state.project;
   $('activeProjectName').textContent = state.title || p.title || 'Untitled Review';
@@ -187,28 +189,29 @@ $('shareBtn').addEventListener('click', async () => {
   clearError();
   const tab = await getActiveTab();
   const tabId = tab?.id;
-  const state = await bg({ type: 'GET_STATE', payload: { tabId } });
 
-  if (state.isAnonymous) {
+  // First ask background to set pendingShare (this also returns needsAuth if anon)
+  let res = await bg({ type: 'SHARE', payload: { tabId } });
+  console.log('[Popup] shareBtn — initial SHARE response:', res);
+
+  if (res.ok && res.needsAuth) {
     const ga = $('googleAuthBtn');
     if (ga) {
       ga.disabled = true;
       ga.textContent = 'Connecting…';
     }
-    const res = await bg({ type: 'SIGN_IN_GOOGLE' });
-    if (res.ok) {
-      if (res.shareUrl) {
-        showShareUrl(res.shareUrl);
-      } else {
-        showActiveView({ project: state.project, user: res.user, isAnonymous: false, url: state.url, title: state.title });
-      }
-    } else {
-      showError(res.error || 'Google sign-in failed.');
+    const authRes = await bg({ type: 'SIGN_IN_GOOGLE' });
+    console.log('[Popup] shareBtn — SIGN_IN_GOOGLE response:', authRes);
+    if (authRes.ok && authRes.shareUrl) {
+      showShareUrl(authRes.shareUrl);
+    } else if (authRes.ok) {
+      showError('Google sign-in succeeded but no share URL was generated. Try clicking Share again.');
+    } else if (authRes.ok === false) {
+      showError(authRes.error || 'Google sign-in failed.');
     }
     return;
   }
 
-  const res = await bg({ type: 'SHARE', payload: { tabId } });
   if (res.ok && res.shareUrl) {
     showShareUrl(res.shareUrl);
   } else {

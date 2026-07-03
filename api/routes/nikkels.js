@@ -147,8 +147,8 @@ router.get('/nikkels/:id/replies', requireAuth, async (req, res) => {
 
 router.post('/nikkels/:id/replies', requireAuth, async (req, res) => {
   try {
-    const { authorName, authorEmail, text } = req.body
-    if (!authorName || !text) {
+    const { authorName, authorEmail, text: body } = req.body
+    if (!authorName || !body) {
       return res.status(400).json({ error: 'authorName and text are required' })
     }
 
@@ -158,7 +158,7 @@ router.post('/nikkels/:id/replies', requireAuth, async (req, res) => {
         nikkel_id: req.params.id,
         author_name: authorName,
         author_email: authorEmail,
-        text,
+        body,
         is_client: false
       })
       .select()
