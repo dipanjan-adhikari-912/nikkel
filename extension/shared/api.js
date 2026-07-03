@@ -1,4 +1,5 @@
-const API_BASE = 'http://localhost:3002'
+// D E P R E C A T E D — this file is part of a stale copy and is not used by Chrome.
+const API_BASE = ''
 
 let authToken = null
 

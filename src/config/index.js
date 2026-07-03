@@ -1,6 +1,9 @@
-// REQUIRED: Set these URLs before publishing. Change the values below.
-// In development: http://localhost:3000 and http://localhost:3001.
-// In production: your deployed URLs (e.g. https://nikkel.app, https://api.nikkel.app).
+// REQUIRED: Set these URLs before publishing. Change the values below or
+// set self.__NIKKEL_CONFIG before the service worker initialises.
+//   VIEWER_BASE — production viewer domain (e.g. https://nikkel.app)
+//   API_URL     — production Railway API (e.g. https://api.nikkel.app)
+//   CHROME_STORE_URL — Chrome Web Store listing (optional, used by the
+//                      download page when published to the store)
 
 function must(name, raw) {
   const v = (raw || '').replace(/\/+$/, '');
@@ -9,9 +12,17 @@ function must(name, raw) {
   return v;
 }
 
+function optional(name, raw) {
+  const v = (raw || '').replace(/\/+$/, '');
+  if (!v) return '';
+  if (/localhost|127\.0\.0\.1/.test(v)) console.warn(`[Nikkel] ${name} is set to ${v} — not suitable for production.`);
+  return v;
+}
+
 // Override via self.__NIKKEL_CONFIG if needed (e.g. CI builds).
 const cfg = self.__NIKKEL_CONFIG || {};
 
-export const VIEWER_BASE = must('VIEWER_BASE', cfg.VIEWER_BASE || 'http://localhost:3000');
-export const API_URL = must('API_URL', cfg.API_URL || 'http://localhost:3001');
+export const VIEWER_BASE = must('VIEWER_BASE', cfg.VIEWER_BASE);
+export const API_URL = must('API_URL', cfg.API_URL);
+export const CHROME_STORE_URL = optional('CHROME_STORE_URL', cfg.CHROME_STORE_URL);
 export { features } from './features.js';

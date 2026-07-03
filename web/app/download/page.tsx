@@ -1,9 +1,10 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { isExtensionInstalled } from '@/lib/extension'
 
+const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL
 const DOWNLOAD_URL = '/nikkel-alpha.zip'
 
 const steps = [
@@ -81,6 +82,7 @@ function DownloadContent() {
   const returnUrl = searchParams.get('return') || '/'
   const [checking, setChecking] = useState(false)
   const [showTroubleshooting, setShowTroubleshooting] = useState(false)
+  const storeUrl = useMemo(() => CHROME_STORE_URL || '', [])
 
   const handleContinue = async () => {
     setChecking(true)
@@ -92,6 +94,66 @@ function DownloadContent() {
       setChecking(false)
       setShowTroubleshooting(true)
     }
+  }
+
+  if (storeUrl) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-12 sm:px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-[10px] font-bold tracking-tight text-white">
+            N
+          </div>
+          <span className="text-sm font-semibold text-white">Nikkel</span>
+        </div>
+
+        <h1 className="mt-10 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+          Install Nikkel
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Install the Nikkel extension from the Chrome Web Store to start reviewing.
+        </p>
+
+        <a
+          href={storeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand px-8 text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-all hover:bg-brand-hover active:scale-[0.97]"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Install from Chrome Web Store
+        </a>
+
+        <div className="mt-12 border-t border-surface-border pt-8">
+          <button
+            onClick={handleContinue}
+            disabled={checking}
+            className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand text-sm font-semibold text-white shadow-lg shadow-brand/25 transition-all hover:bg-brand-hover disabled:opacity-60 active:scale-[0.97]"
+          >
+            {checking ? 'Detecting…' : 'Continue'}
+          </button>
+
+          {showTroubleshooting && (
+            <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+              <p className="mb-3 text-sm font-semibold text-amber-400">
+                Extension not detected
+              </p>
+              <ul className="space-y-2">
+                {troubleshootingTips.map((tip, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-amber-300/80">
+                    <span className="mt-0.5 shrink-0 text-amber-400">•</span>
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -1,6 +1,10 @@
+// D E P R E C A T E D — this file is no longer imported.
+// Extension config lives in src/config/index.js.
+// Debug endpoints are in debug.js (inline constants).
+
 export const SUPABASE_URL = 'https://ptyogubndwyanjaenmzy.supabase.co';
 export const SUPABASE_ANON = 'sb_publishable_rIIjNoFOiD5H7qhJMUPO3Q_Sjr9rsdl';
-export const VIEWER_BASE = 'http://localhost:3000';
+export const VIEWER_BASE = '';
 
 let _token = null;
 let _refreshToken = null;

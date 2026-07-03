@@ -1,3 +1,5 @@
+import { VIEWER_BASE } from '../../config/index.js';
+
 export class ShareService {
   constructor(supabaseClient, projectRepository) {
     this._client = supabaseClient;
@@ -55,6 +57,6 @@ export class ShareService {
   }
 
   buildShareUrl(shareToken) {
-    return `http://localhost:3000/review/${shareToken}`;
+    return `${VIEWER_BASE}/review/${shareToken}`;
   }
 }
