@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 
 const _RAW_API_URL = process.env.NEXT_PUBLIC_API_URL
-if (!_RAW_API_URL || /localhost|127\.0\.0\.1/.test(_RAW_API_URL)) {
+if (!_RAW_API_URL) {
   throw new Error('NEXT_PUBLIC_API_URL is not configured. Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.')
 }
 const API_BASE = _RAW_API_URL.replace(/\/+$/, '')

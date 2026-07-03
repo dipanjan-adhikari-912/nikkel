@@ -9,9 +9,9 @@ export interface SharedProject {
 }
 
 const RAW = process.env.NEXT_PUBLIC_API_URL
-if (!RAW || /localhost|127\.0\.0\.1/.test(RAW)) {
+if (!RAW) {
   throw new Error(
-    'NEXT_PUBLIC_API_URL is not configured for production.\n' +
+    'NEXT_PUBLIC_API_URL is not configured.\n' +
     'Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.'
   )
 }
