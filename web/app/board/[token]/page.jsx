@@ -20,7 +20,7 @@ export default function BoardPage({ params }) {
   const iframeRef = useRef(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/board/${params.token}`)
+    fetch(`${API_BASE}/api/board/${params.token}`)
       .then(r => r.json())
       .then(data => {
         setProject(data.project)
@@ -45,7 +45,7 @@ export default function BoardPage({ params }) {
     if (!replyText.trim() || !replyName.trim()) return
     setSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/board/${params.token}/reply`, {
+      const res = await fetch(`${API_BASE}/api/board/${params.token}/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

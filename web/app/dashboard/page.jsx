@@ -58,7 +58,7 @@ export default function DashboardPage() {
     const t = token || localStorage.getItem('nikkel_token')
     const headers = { 'Content-Type': 'application/json', ...opts.headers }
     if (t) headers['Authorization'] = `Bearer ${t}`
-    const res = await fetch(`${API_BASE}${path}`, { ...opts, headers })
+    const res = await fetch(`${API_BASE}/api${path}`, { ...opts, headers })
     const body = await res.json().catch(() => ({ error: 'Unexpected response' }))
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`)
     return body

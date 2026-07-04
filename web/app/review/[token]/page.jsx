@@ -9,6 +9,9 @@ if (!_RAW) {
 const API_BASE = _RAW.replace(/\/+$/, '')
 const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL
 
+console.log("REVIEW PAGE BUILD: VERCEL MIGRATION v2");
+console.log("API_BASE =", API_BASE);
+
 export default function ReviewPage({ params }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -18,7 +21,7 @@ export default function ReviewPage({ params }) {
   const openTimeoutRef = useRef(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/board/${params.token}`)
+    fetch(`${API_BASE}/api/board/${params.token}`)
       .then(r => {
         if (r.status === 404) throw new Error('not-found')
         if (!r.ok) throw new Error('server-error')

@@ -1,10 +1,10 @@
 // Production defaults. Override via self.__NIKKEL_CONFIG for local development.
 //   VIEWER_BASE       — required; Vercel viewer domain
-//   API_URL           — required; Railway API endpoint
+//   API_URL           — required; Vercel API endpoint (same domain as viewer)
 //   CHROME_STORE_URL  — optional; set when published to Chrome Web Store
 
 const VIEWER = 'https://nikkel-wheat.vercel.app';
-const API = 'https://attractive-imagination-production-eb6b.up.railway.app';
+const API = 'https://nikkel-wheat.vercel.app';
 
 function must(name, raw) {
   const v = (raw || '').replace(/\/+$/, '');
