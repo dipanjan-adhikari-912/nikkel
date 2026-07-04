@@ -2,11 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 
-const _RAW = process.env.NEXT_PUBLIC_API_URL
-if (!_RAW) {
-  throw new Error('NEXT_PUBLIC_API_URL is not configured. Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.')
-}
-const API_BASE = _RAW.replace(/\/+$/, '')
+
 
 export default function BoardPage({ params }) {
   const [project, setProject] = useState(null)
@@ -20,7 +16,7 @@ export default function BoardPage({ params }) {
   const iframeRef = useRef(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/board/${params.token}`)
+    fetch(`/api/board/${params.token}`)
       .then(r => r.json())
       .then(data => {
         setProject(data.project)
@@ -45,7 +41,7 @@ export default function BoardPage({ params }) {
     if (!replyText.trim() || !replyName.trim()) return
     setSubmitting(true)
     try {
-      const res = await fetch(`${API_BASE}/api/board/${params.token}/reply`, {
+      const res = await fetch(`/api/board/${params.token}/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -9,6 +9,7 @@ const globalState = {
   token: null,
   refreshToken: null,
   isAnonymous: false,
+  shareAsGuest: false,
   globalDisabled: false,
 };
 
@@ -23,13 +24,43 @@ function getTabState(tabId) {
 
 let pendingShare = null;
 
+function setSignedOut() {
+  globalState.user = null;
+  globalState.token = null;
+  globalState.refreshToken = null;
+  globalState.isAnonymous = false;
+  globalState.shareAsGuest = false;
+}
+
+function setAnonymousUser(user, token, refreshToken) {
+  globalState.user = user;
+  globalState.token = token;
+  globalState.refreshToken = refreshToken;
+  globalState.isAnonymous = true;
+  globalState.shareAsGuest = false;
+}
+
+function setAuthenticatedUser(user, token, refreshToken) {
+  globalState.user = user;
+  globalState.token = token;
+  globalState.refreshToken = refreshToken;
+  globalState.isAnonymous = false;
+  globalState.shareAsGuest = false;
+}
+
+function syncTokens(token, refreshToken) {
+  globalState.token = token;
+  globalState.refreshToken = refreshToken;
+}
+
 async function saveState() {
   const tabObj = {};
   for (const [tabId, ts] of tabState) {
     if (ts.project) tabObj[String(tabId)] = { mode: ts.mode, project: ts.project, review: ts.review, nikkels: ts.nikkels, readOnly: ts.readOnly };
   }
+  const { shareAsGuest, ...cleanState } = globalState;
   await chrome.storage.local.set({
-    nikkelState: globalState,
+    nikkelState: cleanState,
     nikkelTabState: tabObj,
     pendingShare,
   });
@@ -38,16 +69,26 @@ async function saveState() {
 async function loadState() {
   const r = await chrome.storage.local.get(['nikkelState', 'nikkelTabState', 'pendingShare']);
   if (r.nikkelState) Object.assign(globalState, r.nikkelState);
+  globalState.shareAsGuest = false;
   if (r.nikkelTabState) {
     for (const [tabId, ts] of Object.entries(r.nikkelTabState)) {
       tabState.set(Number(tabId), ts);
     }
   }
   if (r.pendingShare) pendingShare = r.pendingShare;
-  if (globalState.token && !globalState.refreshToken) {
-    globalState.user = null;
-    globalState.token = null;
-    globalState.refreshToken = null;
+  const hasUser = !!globalState.user;
+  const hasToken = !!globalState.token;
+  const hasRefresh = !!globalState.refreshToken;
+  if (hasUser !== hasToken || hasToken !== hasRefresh) {
+    setSignedOut();
+    await saveState();
+    supabaseClient.setTokens(globalState.token, globalState.refreshToken);
+    return;
+  }
+  // Migration: old code could save anon users with isAnonymous=false.
+  // If user has no email they're almost certainly anonymous, so force reset.
+  if (hasUser && !globalState.isAnonymous && !globalState.user?.email) {
+    setSignedOut();
     await saveState();
   }
   supabaseClient.setTokens(globalState.token, globalState.refreshToken);
@@ -68,6 +109,49 @@ async function sendToTab(tabId, msg, retries = 5) {
 }
 
 let ready = loadState();
+
+async function completeUpgrade(anonToken, anonUserId, tabIdOverride) {
+  const targetTabId = (pendingShare && pendingShare.tabId) || tabIdOverride;
+  if (!targetTabId || !anonToken || !anonUserId) {
+    await saveState();
+    return null;
+  }
+  const ts = getTabState(targetTabId);
+  if (!ts.project) {
+    await saveState();
+    return null;
+  }
+  try {
+    await supabaseClient.request(`/rest/v1/projects?id=eq.${ts.project.id}`, {
+      method: 'PATCH', token: anonToken,
+      body: JSON.stringify({ owner_id: globalState.user.id }),
+    });
+    ts.project.ownerId = globalState.user.id;
+  } catch (e) {
+    console.warn('[BG] Failed to transfer project ownership', e.message);
+  }
+  try {
+    const anonReview = await shareService.ensureProjectReview(ts.project.id, anonUserId, anonToken);
+    if (anonReview) {
+      await supabaseClient.request(`/rest/v1/reviews?id=eq.${anonReview.id}`, {
+        method: 'PATCH', token: anonToken,
+        body: JSON.stringify({ owner_id: globalState.user.id }),
+      });
+      ts.review = anonReview;
+      ts.review.owner_id = globalState.user.id;
+    }
+  } catch (e) {
+    console.warn('[BG] Failed to transfer review ownership', e.message);
+  }
+  let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
+  if (!review) return null;
+  ts.review = review;
+  const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
+  const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
+  pendingShare = null;
+  await saveState();
+  return shareUrl;
+}
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   await ready;
@@ -106,15 +190,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE':
-        return { ok: true, user: globalState.user, mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false };
+        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false };
 
       case 'INIT_ANONYMOUS': {
         if (globalState.token && globalState.user) return { ok: true, user: globalState.user, isAnonymous: globalState.isAnonymous };
         const result = await authService.signInAnonymously();
-        globalState.user = result.user;
-        globalState.token = result.token;
-        globalState.refreshToken = result.refreshToken;
-        globalState.isAnonymous = true;
+        setAnonymousUser(result.user, result.token, result.refreshToken);
         await saveState();
         return { ok: true, user: result.user, isAnonymous: true };
       }
@@ -124,10 +205,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const { tabId: tId, title, url } = msg.payload;
         if (!globalState.token) {
           const anon = await authService.signInAnonymously();
-          globalState.user = anon.user;
-          globalState.token = anon.token;
-          globalState.refreshToken = anon.refreshToken;
-          globalState.isAnonymous = true;
+          setAnonymousUser(anon.user, anon.token, anon.refreshToken);
           await saveState();
           supabaseClient.setTokens(globalState.token, globalState.refreshToken);
         }
@@ -220,20 +298,69 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!nikkelId || !text) return { ok: false, error: 'Missing nikkelId or text' };
         try {
           const authorName = globalState.user?.user_metadata?.full_name || 'Anonymous';
-          const res = await fetch(`${API_URL}/api/comments`, {
+          const supabaseRes = await fetch(`${SUPABASE_URL}/rest/v1/replies`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nikkelId, text, authorName }),
+            headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json', Authorization: `Bearer ${globalState.token}`, Prefer: 'return=representation' },
+            body: JSON.stringify({ nikkel_id: nikkelId, body: text, author_name: authorName, is_client: true }),
           });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            return { ok: false, error: err.error || `HTTP ${res.status}` };
+          if (!supabaseRes.ok) {
+            let msg = supabaseRes.statusText;
+            try { const e = await supabaseRes.json(); msg = e.message || e.error || e.msg || msg; } catch {}
+            return { ok: false, error: msg };
           }
-          const comment = await res.json();
-          return { ok: true, comment };
+          const data = await supabaseRes.json();
+          const row = Array.isArray(data) ? data[0] : data;
+          return { ok: true, comment: row || { body: text, author_name: authorName } };
         } catch (e) {
           return { ok: false, error: e.message };
         }
+      }
+
+      case 'SHARE_AS_GUEST': {
+        const srcTabIdG = msg.payload?.tabId || tabId;
+        if (!srcTabIdG) return { ok: false, error: 'No tab context' };
+        const tabG = getTabState(srcTabIdG);
+        if (!tabG.project) return { ok: false, error: 'No active project' };
+        let reviewG = await shareService.ensureProjectReview(tabG.project.id, globalState.user?.id, globalState.token);
+        if (!reviewG) return { ok: false, error: 'Failed to create review' };
+        tabG.review = reviewG;
+        const shareTokenG = await shareService.ensureShareToken(reviewG.id, globalState.token);
+        const shareUrlG = `${VIEWER_BASE}/review/${shareTokenG}`;
+    pendingShare = null;
+    await saveState();
+    return { ok: true, shareUrl: shareUrlG };
+      }
+
+      case 'SIGN_UP_EMAIL': {
+        const { email: regEmail, password: regPassword } = msg.payload || {};
+        if (!regEmail || !regPassword) return { ok: false, error: 'Email and password required' };
+        const anonTokenReg = globalState.token;
+        const anonUserIdReg = globalState.user?.id;
+        let regResult;
+        try { regResult = await authService.signUpWithEmail(regEmail, regPassword); }
+        catch (e) { return { ok: false, error: e.message }; }
+        setAuthenticatedUser(regResult.user, regResult.token, regResult.refreshToken);
+        supabaseClient.setTokens(regResult.token, regResult.refreshToken);
+        const shareUrlReg = await completeUpgrade(anonTokenReg, anonUserIdReg, tabId);
+        if (shareUrlReg) return { ok: true, user: globalState.user, shareUrl: shareUrlReg };
+        await saveState();
+        return { ok: true, user: globalState.user };
+      }
+
+      case 'SIGN_IN_EMAIL': {
+        const { email: signEmail, password: signPassword } = msg.payload || {};
+        if (!signEmail || !signPassword) return { ok: false, error: 'Email and password required' };
+        const anonTokenSign = globalState.token;
+        const anonUserIdSign = globalState.user?.id;
+        let signResult;
+        try { signResult = await authService.signInWithEmail(signEmail, signPassword); }
+        catch (e) { return { ok: false, error: e.message }; }
+        setAuthenticatedUser(signResult.user, signResult.token, signResult.refreshToken);
+        supabaseClient.setTokens(signResult.token, signResult.refreshToken);
+        const shareUrlSign = await completeUpgrade(anonTokenSign, anonUserIdSign, tabId);
+        if (shareUrlSign) return { ok: true, user: globalState.user, shareUrl: shareUrlSign };
+        await saveState();
+        return { ok: true, user: globalState.user };
       }
 
       case 'SIGN_IN_GOOGLE': {
@@ -252,30 +379,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
         if (!accessToken) return { ok: false, error: 'No access token in response' };
+
+        const anonToken = globalState.token;
+        const anonUserId = globalState.user?.id;
+
+        const userInfo = await authService.getUserInfo(accessToken);
         supabaseClient.setTokens(accessToken, refreshToken);
-        globalState.user = await authService.getUserInfo(accessToken);
-        globalState.token = accessToken;
-        globalState.refreshToken = refreshToken;
-        globalState.isAnonymous = false;
-        console.log('[BG] SIGN_IN_GOOGLE — after auth, pendingShare:', pendingShare, 'pendingShare?.tabId:', pendingShare?.tabId);
-        if (pendingShare && pendingShare.tabId) {
-          const ts = getTabState(pendingShare.tabId);
-          console.log('[BG] SIGN_IN_GOOGLE — pendingShare tabState project:', ts?.project?.id, 'review:', ts?.review?.id);
-          if (ts.project) {
-            let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
-            console.log('[BG] SIGN_IN_GOOGLE — ensureProjectReview returned:', review?.id);
-            if (review) {
-              ts.review = review;
-              const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
-              const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
-              pendingShare = null;
-              await saveState();
-              return { ok: true, user: globalState.user, shareUrl };
-            }
-            console.error('[BG] SIGN_IN_GOOGLE: ensureProjectReview returned null — review not created after Google auth');
-          }
-        }
-        console.log('[BG] SIGN_IN_GOOGLE — returning user only, no shareUrl (pendingShare was not set)');
+        setAuthenticatedUser(userInfo, accessToken, refreshToken);
+
+        const shareUrl = await completeUpgrade(anonToken, anonUserId, tabId);
+        if (shareUrl) return { ok: true, user: globalState.user, shareUrl };
         await saveState();
         return { ok: true, user: globalState.user };
       }
@@ -364,10 +477,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       case 'SIGN_OUT': {
-        globalState.user = null;
-        globalState.token = null;
-        globalState.refreshToken = null;
-        globalState.isAnonymous = false;
+        setSignedOut();
         tabState.clear();
         await saveState();
         return { ok: true };
@@ -424,7 +534,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
         if (!tab.project) return { ok: false, error: 'No active project' };
-        console.log('[BG] SHARE — isAnonymous:', globalState.isAnonymous, 'project:', tab.project.id, 'pendingShare:', pendingShare);
+        console.log('[BG] SHARE — isAnonymous:', globalState.isAnonymous, 'project:', tab.project.id, 'pendingShare:', pendingShare, 'shareAsGuest:', globalState.shareAsGuest);
 
         if (globalState.isAnonymous) {
           pendingShare = { tabId: srcTabId };
@@ -444,6 +554,97 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, shareUrl };
       }
 
+      case 'GET_USER_PROFILE': {
+        try {
+          const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${globalState.token}` },
+          });
+          if (!res.ok) {
+            let msg = res.statusText;
+            try { const e = await res.json(); msg = e.message || e.error || e.msg || msg; } catch {}
+            return { ok: false, error: msg };
+          }
+          const data = await res.json();
+          return {
+            ok: true,
+            user: {
+              id: data.id,
+              email: data.email,
+              email_confirmed_at: data.email_confirmed_at,
+              last_sign_in_at: data.last_sign_in_at,
+              user_metadata: data.user_metadata || {},
+              app_metadata: data.app_metadata || {},
+            },
+            identities: data.identities || [],
+          };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
+      case 'UPDATE_PROFILE': {
+        const { fullName } = msg.payload || {};
+        if (!fullName) return { ok: false, error: 'Name is required' };
+        try {
+          const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            method: 'PUT',
+            headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json', Authorization: `Bearer ${globalState.token}` },
+            body: JSON.stringify({ data: { full_name: fullName } }),
+          });
+          if (!res.ok) {
+            let msg = res.statusText;
+            try { const e = await res.json(); msg = e.message || e.error || e.msg || msg; } catch {}
+            return { ok: false, error: msg };
+          }
+          const updatedUser = await authService.getUserInfo(globalState.token);
+          setAuthenticatedUser(updatedUser, globalState.token, globalState.refreshToken);
+          await saveState();
+          return { ok: true, user: globalState.user };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
+      case 'CHANGE_PASSWORD': {
+        const { newPassword } = msg.payload || {};
+        if (!newPassword || newPassword.length < 6) return { ok: false, error: 'Password must be at least 6 characters' };
+        try {
+          const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            method: 'PUT',
+            headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json', Authorization: `Bearer ${globalState.token}` },
+            body: JSON.stringify({ password: newPassword }),
+          });
+          if (!res.ok) {
+            let msg = res.statusText;
+            try { const e = await res.json(); msg = e.message || e.error || e.msg || msg; } catch {}
+            return { ok: false, error: msg };
+          }
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
+      case 'FORGOT_PASSWORD': {
+        const { email } = msg.payload || {};
+        if (!email) return { ok: false, error: 'Email is required' };
+        try {
+          const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+            method: 'POST',
+            headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          if (!res.ok) {
+            let msg = res.statusText;
+            try { const e = await res.json(); msg = e.message || e.error || e.msg || msg; } catch {}
+            return { ok: false, error: msg };
+          }
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
       default:
         return { ok: false, error: 'Unknown message type' };
     }
@@ -452,8 +653,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   handle().then((result) => {
     const nt = supabaseClient.getToken();
     if (nt && nt !== globalState.token) {
-      globalState.token = nt;
-      globalState.refreshToken = supabaseClient.getRefreshToken();
+      syncTokens(nt, supabaseClient.getRefreshToken());
       saveState();
     }
     sendResponse(result);

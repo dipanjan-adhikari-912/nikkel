@@ -31,6 +31,24 @@
     #toggleRow { display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; border-bottom: 1px solid #1e293b; font-size: 12px; color: #64748b; }
     #toggleBtn { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; color: #6366f1; }
     #toggleBtn.off { color: #475569; }
+    #userRow { display: none; align-items: center; gap: 8px; padding: 8px 20px; border-bottom: 1px solid #1e293b; font-size: 12px; }
+    #userRow.show { display: flex; }
+    #userAvatar { width: 24px; height: 24px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #94a3b8; flex-shrink: 0; }
+    #userInfo { flex: 1; min-width: 0; }
+    #userName { color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #userEmail { color: #64748b; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .guest-badge { background: #334155; color: #fbbf24; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    .badge-row { display: flex; align-items: center; gap: 6px; }
+    .badge-row .link { font-size: 11px; }
+    #authRow { display: none; }
+    #userActions { display: flex; gap: 4px; align-items: center; }
+    #userActions .link { font-size: 11px; }
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+    .form-group input { width: 100%; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 4px; padding: 8px; font-size: 13px; box-sizing: border-box; }
+    .form-group input:focus { outline: none; border-color: #6366f1; }
+    .form-toggle { text-align: center; margin-top: 10px; font-size: 12px; color: #64748b; }
+    .auth-title { font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 16px; }
     .disabled-msg { text-align: center; padding: 40px 20px; color: #64748b; }
     .disabled-msg .icon { font-size: 32px; margin-bottom: 8px; }
     .disabled-msg h2 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #e2e8f0; }
@@ -43,6 +61,26 @@
   <div id="toggleRow">
     <span>Nikkel</span>
     <button id="toggleBtn" title="Toggle extension">⏻</button>
+  </div>
+
+  <div id="userRow">
+    <div id="userAvatar">👤</div>
+    <div id="userInfo">
+      <div id="userName"></div>
+      <div id="userEmail"></div>
+    </div>
+    <div id="userActions">
+      <span class="link" id="settingsLink">Settings</span>
+      <span class="link" id="signOutLink">Sign out</span>
+    </div>
+    <div id="authRow" class="badge-row">
+      <span class="guest-badge">Guest</span>
+      <span class="link" id="upgradeBtn">Upgrade</span>
+    </div>
+  </div>
+
+  <div id="vAuth" class="view">
+    <div id="authForm"></div>
   </div>
 
   <div id="vDisabled" class="view">

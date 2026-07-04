@@ -24,9 +24,11 @@ const BAR_HTML = `
     #projectName { color: #e2e8f0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
     #modeDot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; flex-shrink: 0; }
     #modeLabel { color: #e2e8f0; font-weight: 500; }
-    #modeDd { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; padding: 2px 4px; font-size: 12px; cursor: pointer; }
-    .mode-opt { padding: 4px 8px; cursor: pointer; }
-    .mode-opt:hover { background: #1e293b; }
+    #modeToggle { display: flex; gap: 0; border: 1px solid #334155; border-radius: 4px; overflow: hidden; }
+    #modeToggle button { background: #1e293b; color: #64748b; border: none; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
+    #modeToggle button:not(.active):hover { background: #334155; color: #94a3b8; }
+    #modeToggle button.active { background: #6366f1; color: #fff; font-weight: 500; }
+    #modeToggle button:first-child { border-right: 1px solid #334155; }
     #inspIdle { color: #64748b; font-style: italic; }
     #inspLive { display: none; gap: 8px; flex-wrap: wrap; }
     #inspLive span { white-space: nowrap; }
@@ -35,9 +37,7 @@ const BAR_HTML = `
     #pinsBtn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
     #pinsBtn:hover { background: #334155; }
     #pinsBadge { background: #6366f1; color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
-    #refreshBtn { background: transparent; border: 1px solid #475569; color: #94a3b8; border-radius: 4px; padding: 4px 6px; cursor: pointer; font-size: 14px; line-height: 1; }
-    #refreshBtn:hover { background: #1e293b; color: #e2e8f0; }
-    #shareBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 500; font-size: 12px; }
+    #shareBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 500; font-size: 12px; margin-left: auto; }
     #shareBtn:hover { background: #4f46e5; }
     #shareOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 2147483647; align-items: center; justify-content: center; }
     #shareOverlay.visible { display: flex; }
@@ -50,11 +50,6 @@ const BAR_HTML = `
     #copyBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 500; }
     #copyBtn:hover { background: #4f46e5; }
     #shareMeta { font-size: 11px; color: #64748b; margin-top: 8px; }
-    #doneBtn { background: transparent; border: 1px solid #475569; color: #94a3b8; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; margin-left: auto; }
-    #doneBtn:hover { background: #1e293b; color: #e2e8f0; }
-    #modeDot.annotate { background: #10b981; }
-    #modeDot.browse { background: #f59e0b; }
-    #modeDot.idle { background: #64748b; }
   </style>
   <div id="bar">
     <div class="bar-section">
@@ -62,13 +57,12 @@ const BAR_HTML = `
     </div>
     <div class="bar-sep"></div>
     <div class="bar-section">
-      <span id="modeDot" class="idle"></span>
-      <span id="modeLabel">Idle</span>
-      <select id="modeDd">
-        <option value="idle">Idle</option>
-        <option value="annotate">Annotate</option>
-        <option value="browse">Browse</option>
-      </select>
+      <span id="modeDot" class="browse"></span>
+      <span id="modeLabel">Browse</span>
+      <span id="modeToggle">
+        <button id="browseBtn">Browse</button>
+        <button id="annotateBtn">Annotate</button>
+      </span>
     </div>
     <div class="bar-sep"></div>
     <div class="bar-section" id="inspIdle">Hover over elements to inspect</div>
@@ -80,9 +74,7 @@ const BAR_HTML = `
     </div>
     <div class="bar-sep"></div>
     <button id="pinsBtn">📍<span id="pinsBadge">0</span></button>
-    <button id="refreshBtn">↻</button>
     <button id="shareBtn">🔗 Share</button>
-    <button id="doneBtn">✓ Done</button>
   </div>
   <div id="shareOverlay">
     <div id="shareModal">
@@ -187,7 +179,7 @@ const PINS_CSS = `
   height: 0 !important;
 `;
 
-let currentMode = 'idle';
+let currentMode = 'browse';
 let barHost = null;
 let commentHost = null;
 let popoverHost = null;
@@ -288,12 +280,12 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   shadow.innerHTML = BAR_HTML;
 
   const projectNameEl = qs(shadow, 'projectName');
-  const modeDd = qs(shadow, 'modeDd');
+  const browseBtn = qs(shadow, 'browseBtn');
+  const annotateBtn = qs(shadow, 'annotateBtn');
   const inspIdle = qs(shadow, 'inspIdle');
   const inspLive = qs(shadow, 'inspLive');
   const pinsBtn = qs(shadow, 'pinsBtn');
   const pinsBadge = qs(shadow, 'pinsBadge');
-  const refreshBtn = qs(shadow, 'refreshBtn');
   const shareBtn = qs(shadow, 'shareBtn');
   const shareOverlay = qs(shadow, 'shareOverlay');
   const shareUrlTxt = qs(shadow, 'shareUrlTxt');
@@ -303,7 +295,6 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   const shareAuthSection = qs(shadow, 'shareAuthSection');
   const shareGoogleBtn = qs(shadow, 'shareGoogleBtn');
   const shareClose = qs(shadow, 'shareClose');
-  const doneBtn = qs(shadow, 'doneBtn');
 
   pinsContainer = createShadowHost('nikkel-pins');
   pinsContainer.style.cssText = PINS_CSS;
@@ -311,7 +302,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   savedPaddingBottom = document.body.style.paddingBottom || '';
   document.body.style.paddingBottom = '42px';
 
-  setMode(initialMode || 'idle');
+  setMode(initialMode || 'browse');
 
   if (projectNameEl) projectNameEl.textContent = projectName || '';
   if (shareUrl && shareUrlTxt) {
@@ -327,18 +318,15 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   document.addEventListener('mousemove', handleMousemove);
   document.addEventListener('click', handleDocumentClick, true);
   document.addEventListener('keydown', handleKeydown);
+  document.addEventListener('contextmenu', handleContextMenu);
 
-  if (modeDd) {
-    modeDd.addEventListener('change', () => {
-      const mode = modeDd.value;
-      if (readOnly && mode === 'annotate') {
-        modeDd.value = 'browse';
-        return;
-      }
-      setMode(mode);
-      bgMsg({ type: 'MODE_CHANGED', payload: { mode } });
-    });
-  }
+  const switchMode = (mode) => {
+    if (readOnly && mode === 'annotate') return;
+    setMode(mode);
+    bgMsg({ type: 'MODE_CHANGED', payload: { mode } });
+  };
+  if (browseBtn) browseBtn.addEventListener('click', () => switchMode('browse'));
+  if (annotateBtn) annotateBtn.addEventListener('click', () => switchMode('annotate'));
 
   if (pinsBtn) {
     pinsBtn.addEventListener('click', () => {
@@ -346,18 +334,6 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
       if (pinsContainer) {
         pinsContainer.style.display = isPinsVisible ? '' : 'none';
       }
-    });
-  }
-
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      if (!currentSessionId) return;
-      bgMsg({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (res) => {
-        if (res?.ok && res.nikkels) {
-          removeAllPins();
-          res.nikkels.forEach((n) => addPin(n));
-        }
-      });
     });
   }
 
@@ -415,22 +391,16 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
       };
 
       // Step 1: try SHARE — sets pendingShare if anonymous
-      const shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' });
+      let shareRes;
+      try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { return showError('Extension context lost.'); }
       if (shareRes?.ok && shareRes.shareUrl) return showUrl(shareRes.shareUrl);
       if (!shareRes?.ok) return showError(shareRes?.error || 'Failed to create share link.');
 
       // needsAuth was returned — authenticate, background will create review via pendingShare
-      const authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' });
+      let authRes;
+      try { authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' }); } catch { return showError('Extension context lost.'); }
       if (authRes?.ok && authRes.shareUrl) return showUrl(authRes.shareUrl);
       showError(authRes?.ok ? 'Signed in. Click Share again to generate a link.' : (authRes?.error || 'Google sign-in failed.'));
-    });
-  }
-
-  if (doneBtn) {
-    doneBtn.addEventListener('click', () => {
-      const mode = readOnly ? 'browse' : 'idle';
-      setMode(mode);
-      bgMsg({ type: 'MODE_CHANGED', payload: { mode } });
     });
   }
 
@@ -444,6 +414,7 @@ function removeBar() {
   document.removeEventListener('mousemove', handleMousemove);
   document.removeEventListener('click', handleDocumentClick, true);
   document.removeEventListener('keydown', handleKeydown);
+  document.removeEventListener('contextmenu', handleContextMenu);
   if (barHost) {
     barHost.remove();
     barHost = null;
@@ -462,7 +433,7 @@ function removeBar() {
   readOnly = false;
   document.body.style.paddingBottom = savedPaddingBottom;
   document.getElementById('nikkel-cursor')?.remove();
-  currentMode = 'idle';
+  currentMode = 'browse';
 }
 
 function injectCommentBubble(pageX, pageY, elementInfo) {
@@ -608,10 +579,21 @@ function loadNikkelComments(nikkel) {
   empty.style.display = 'none';
   list.innerHTML = '';
 
-  chrome.runtime.sendMessage({ type: 'GET_NIKKEL_COMMENTS', payload: { nikkelId: nikkel.id } }, (res) => {
-    comments = (res?.ok ? res.comments || [] : []);
-    render();
-  });
+  if (!isValid()) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_NIKKEL_COMMENTS', payload: { nikkelId: nikkel.id } }, (res) => {
+      if (chrome.runtime.lastError) return;
+      const serverComments = (res?.ok ? res.comments || [] : []);
+      const pendingTemps = comments.filter((c) => c._temp);
+      comments = [...serverComments];
+      for (const t of pendingTemps) {
+        if (!comments.find((c) => c._temp === t._temp)) {
+          comments.push(t);
+        }
+      }
+      render();
+    });
+  } catch (e) { console.warn('[Nikkel] GET_NIKKEL_COMMENTS failed', e.message); }
 
   const handleSubmit = async () => {
     const text = input.value.trim();
@@ -619,26 +601,44 @@ function loadNikkelComments(nikkel) {
     submit.disabled = true;
     errEl.style.display = 'none';
 
-    const temp = { id: null, _temp: `tmp-${Date.now()}`, author_name: 'You', text, created_at: null };
+    const temp = { id: null, _temp: `tmp-${Date.now()}`, author_name: 'You', body: text, created_at: null };
     comments.push(temp);
     render();
     input.value = '';
 
-    chrome.runtime.sendMessage({ type: 'SUBMIT_COMMENT', payload: { nikkelId: nikkel.id, text } }, (res2) => {
-      submit.disabled = false;
-      if (res2?.ok && res2.comment) {
-        const idx = comments.findIndex((c) => c._temp === temp._temp);
-        if (idx !== -1) {
-          comments[idx] = res2.comment;
+    if (!isValid()) { submit.disabled = false; return; }
+    try {
+      chrome.runtime.sendMessage({ type: 'SUBMIT_COMMENT', payload: { nikkelId: nikkel.id, text } }, (res2) => {
+        submit.disabled = false;
+        if (chrome.runtime.lastError) {
+          comments = comments.filter((c) => c._temp !== temp._temp);
           render();
+          errEl.textContent = 'Extension context lost.';
+          errEl.style.display = '';
+          return;
         }
-      } else {
-        comments = comments.filter((c) => c._temp !== temp._temp);
-        render();
-        errEl.textContent = res2?.error || 'Failed to post comment.';
-        errEl.style.display = '';
-      }
-    });
+        if (res2?.ok && res2.comment) {
+          const idx = comments.findIndex((c) => c._temp === temp._temp);
+          if (idx !== -1) {
+            comments[idx] = res2.comment;
+          } else {
+            comments.push(res2.comment);
+          }
+          render();
+        } else {
+          comments = comments.filter((c) => c._temp !== temp._temp);
+          render();
+          errEl.textContent = res2?.error || 'Failed to post comment.';
+          errEl.style.display = '';
+        }
+      });
+    } catch (e) {
+      submit.disabled = false;
+      comments = comments.filter((c) => c._temp !== temp._temp);
+      render();
+      errEl.textContent = 'Failed to post comment.';
+      errEl.style.display = '';
+    }
   };
 
   submit.onclick = handleSubmit;
@@ -701,6 +701,7 @@ function addPin(nikkel) {
   });
   pin.addEventListener('click', (e) => {
     e.stopPropagation();
+    removeCommentBubble();
     injectPopover(nikkel.pageX + 13, nikkel.pageY + 13, nikkel);
   });
   pinsContainer.appendChild(pin);
@@ -762,14 +763,14 @@ function handleMousemove(e) {
 
 async function handleDocumentClick(e) {
   if (currentMode !== 'annotate') return;
-  if (commentHost) return;
   const target = e.target;
   if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) return;
-  if (target.closest('a, button, input, select, textarea, [role="button"], [onclick]')) {
-    e.preventDefault();
-    e.stopPropagation();
-    return;
-  }
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (commentHost) removeCommentBubble();
+  if (popoverHost) removePopover();
 
   const info = getElementInfo(target);
   const pageX = Math.round(e.clientX + window.scrollX);
@@ -813,10 +814,14 @@ function handleKeydown(e) {
       overlay.classList.remove('visible');
       return;
     }
-    if (currentMode === 'annotate') {
-      setMode('idle');
-      bgMsg({ type: 'MODE_CHANGED', payload: { mode: 'idle' } });
-    }
+  }
+}
+
+function handleContextMenu(e) {
+  if (currentMode === 'annotate') {
+    const target = e.target;
+    if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) return;
+    e.preventDefault();
   }
 }
 
@@ -827,28 +832,28 @@ function setMode(mode) {
     const shadow = host.shadowRoot;
     const modeDot = qs(shadow, 'modeDot');
     const modeLabel = qs(shadow, 'modeLabel');
-    const modeDd = qs(shadow, 'modeDd');
+    const browseBtn = qs(shadow, 'browseBtn');
+    const annotateBtn = qs(shadow, 'annotateBtn');
     const inspIdle = qs(shadow, 'inspIdle');
     const inspLive = qs(shadow, 'inspLive');
     if (modeDot) modeDot.className = mode;
-    if (modeLabel) {
-      const labels = { idle: 'Idle', annotate: 'Annotate', browse: 'Browse' };
-      modeLabel.textContent = labels[mode] || 'Idle';
-    }
-    if (modeDd) modeDd.value = mode;
+    if (modeLabel) modeLabel.textContent = mode === 'annotate' ? 'Annotate' : 'Browse';
+    if (browseBtn) browseBtn.className = mode === 'annotate' ? '' : 'active';
+    if (annotateBtn) annotateBtn.className = mode === 'annotate' ? 'active' : '';
     if (inspIdle) inspIdle.style.display = mode === 'annotate' ? 'none' : '';
     if (inspLive) inspLive.style.display = mode === 'annotate' ? 'flex' : 'none';
   }
-  if (mode !== 'annotate') {
+  if (mode === 'browse') {
     clearHighlight();
     removeCommentBubble();
+    removePopover();
   }
   const cs = document.getElementById('nikkel-cursor');
   if (mode === 'annotate') {
     if (!cs) {
       const s = document.createElement('style');
       s.id = 'nikkel-cursor';
-      s.textContent = '*,*::before,*::after{cursor:crosshair!important}';
+      s.textContent = '*,*::before,*::after{cursor:crosshair!important;user-select:none!important}';
       document.documentElement.appendChild(s);
     }
   } else if (cs) {
@@ -908,13 +913,17 @@ function setBadgeText(text) {
 function loadPinsForReview() {
   if (!currentSessionId) return;
   setBadgeText('...');
-  chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (nres) => {
-    if (nres?.ok && nres.nikkels) {
-      removeAllPins();
-      nres.nikkels.forEach((n) => addPin(n));
-    }
-    updateBadge();
-  });
+  if (!isValid()) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (nres) => {
+      if (chrome.runtime.lastError) return;
+      if (nres?.ok && nres.nikkels) {
+        removeAllPins();
+        nres.nikkels.forEach((n) => addPin(n));
+      }
+      updateBadge();
+    });
+  } catch (e) { console.warn('[Nikkel] GET_NIKKELS failed', e.message); }
 }
 
 function onPageReady(fn) {
@@ -926,12 +935,16 @@ function onPageReady(fn) {
 }
 
 function resumeActiveReview() {
-  chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
-    if (res?.ok && res.project) {
-      if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly);
-      onPageReady(loadPinsForReview);
-    }
-  });
+  if (!isValid()) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
+      if (chrome.runtime.lastError) return;
+      if (res?.ok && res.project) {
+        if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly);
+        onPageReady(loadPinsForReview);
+      }
+    });
+  } catch (e) { console.warn('[Nikkel] GET_STATE failed', e.message); }
 }
 
 onPageReady(() => {
@@ -945,7 +958,7 @@ let lastUrl = location.href;
 function checkUrlChange() {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
-    if (currentMode !== 'idle') removeBar();
+    if (barHost) removeBar();
   }
 }
 window.addEventListener('popstate', checkUrlChange);
@@ -962,29 +975,39 @@ window.addEventListener('message', (event) => {
   if (event.data?.type === 'OPEN_PROJECT') {
     const { shareId } = event.data?.payload || {};
     if (shareId) {
-      chrome.runtime.sendMessage(
-        { type: 'OPEN_PROJECT', payload: { shareId } },
-        (res) => {
-          if (chrome.runtime.lastError) {
-            window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
-            return;
+      if (!isValid()) return;
+      try {
+        chrome.runtime.sendMessage(
+          { type: 'OPEN_PROJECT', payload: { shareId } },
+          (res) => {
+            if (chrome.runtime.lastError) {
+              window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
+              return;
+            }
+            window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: res || { ok: false, error: 'No response' } }, '*');
           }
-          window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: res || { ok: false, error: 'No response' } }, '*');
-        }
-      );
+        );
+      } catch (e) {
+        window.postMessage({ type: 'OPEN_PROJECT_RESULT', payload: { ok: false, error: 'Extension context lost.' } }, '*');
+      }
     }
   }
   if (event.data?.action === 'LOAD_REVIEW') {
-    chrome.runtime.sendMessage(
-      { type: 'LOAD_REVIEW', payload: { reviewToken: event.data.reviewToken } },
-      (res) => {
-        if (chrome.runtime.lastError) {
-          window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
-          return;
+    if (!isValid()) return;
+    try {
+      chrome.runtime.sendMessage(
+        { type: 'LOAD_REVIEW', payload: { reviewToken: event.data.reviewToken } },
+        (res) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
+            return;
+          }
+          window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: res || { ok: false, error: 'No response from extension' } }, '*');
         }
-        window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: res || { ok: false, error: 'No response from extension' } }, '*');
-      }
-    );
+      );
+    } catch (e) {
+      window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: { ok: false, error: 'Extension context lost.' } }, '*');
+    }
   }
 });
 })();

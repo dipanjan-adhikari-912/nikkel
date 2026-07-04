@@ -35,6 +35,28 @@ export class SupabaseUserRepository {
     };
   }
 
+  async signUpWithEmail(email, password) {
+    const data = await this._client.authSignUpWithEmail(email, password);
+    this._client.setTokens(data.access_token, data.refresh_token);
+    const user = userMapper.fromAuthResponse(data.user);
+    return {
+      user,
+      token: data.access_token,
+      refreshToken: data.refresh_token,
+    };
+  }
+
+  async signInWithEmail(email, password) {
+    const data = await this._client.authSignInWithEmail(email, password);
+    this._client.setTokens(data.access_token, data.refresh_token);
+    const user = userMapper.fromAuthResponse(data.user);
+    return {
+      user,
+      token: data.access_token,
+      refreshToken: data.refresh_token,
+    };
+  }
+
   async exchangeGoogleToken(idToken) {
     const data = await this._client.authExchangeGoogleToken(idToken);
     this._client.setTokens(data.access_token, data.refresh_token);

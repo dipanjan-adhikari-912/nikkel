@@ -24,7 +24,6 @@ The entire backend runs on Vercel as Next.js Route Handlers under `app/api/`. Th
 - [ ] **Set environment variables** in Vercel dashboard:
   - `SUPABASE_URL` — your Supabase project URL
   - `SUPABASE_SERVICE_KEY` — service role key
-  - `NEXT_PUBLIC_API_URL` — the deployed Vercel URL itself (e.g. `https://nikkel-wheat.vercel.app`)
   - `NEXT_PUBLIC_CHROME_STORE_URL` — optional; set once published to the Chrome Web Store
 - [ ] **Confirm health endpoint** responds at `https://your-app.vercel.app/api/health`
 - [ ] **Note the deployed URL** — you will need it as both `VIEWER_BASE` and `API_URL` in the extension config

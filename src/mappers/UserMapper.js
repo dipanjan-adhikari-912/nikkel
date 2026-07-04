@@ -14,7 +14,7 @@ export class UserMapper {
     return new User({
       id: authUser.id,
       email: authUser.email || null,
-      name: authUser.user_metadata?.name || null,
+      name: (authUser.user_metadata?.full_name || authUser.user_metadata?.name || null),
       isAnonymous: false,
     });
   }

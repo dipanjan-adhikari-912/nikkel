@@ -1,16 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 
-const _RAW = process.env.NEXT_PUBLIC_API_URL
-if (!_RAW) {
-  throw new Error('NEXT_PUBLIC_API_URL is not configured. Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.')
-}
-const API_BASE = _RAW.replace(/\/+$/, '')
 const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL
-
-console.log("REVIEW PAGE BUILD: VERCEL MIGRATION v2");
-console.log("API_BASE =", API_BASE);
 
 export default function ReviewPage({ params }) {
   const [data, setData] = useState(null)
@@ -21,7 +13,7 @@ export default function ReviewPage({ params }) {
   const openTimeoutRef = useRef(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/board/${params.token}`)
+    fetch(`/api/board/${params.token}`)
       .then(r => {
         if (r.status === 404) throw new Error('not-found')
         if (!r.ok) throw new Error('server-error')

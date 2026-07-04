@@ -2,11 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 
-const _RAW_API_URL = process.env.NEXT_PUBLIC_API_URL
-if (!_RAW_API_URL) {
-  throw new Error('NEXT_PUBLIC_API_URL is not configured. Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.')
-}
-const API_BASE = _RAW_API_URL.replace(/\/+$/, '')
+
 
 const btn = {
   width: '100%', padding: '10px 16px', border: 'none', borderRadius: 8,
@@ -58,7 +54,7 @@ export default function DashboardPage() {
     const t = token || localStorage.getItem('nikkel_token')
     const headers = { 'Content-Type': 'application/json', ...opts.headers }
     if (t) headers['Authorization'] = `Bearer ${t}`
-    const res = await fetch(`${API_BASE}/api${path}`, { ...opts, headers })
+    const res = await fetch(`/api${path}`, { ...opts, headers })
     const body = await res.json().catch(() => ({ error: 'Unexpected response' }))
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`)
     return body

@@ -6,7 +6,7 @@ function showView(id) {
 }
 
 async function bg(msg) {
-  return chrome.runtime.sendMessage(msg);
+  try { return await chrome.runtime.sendMessage(msg); } catch { return { ok: false, error: 'Extension context lost.' }; }
 }
 
 function showError(msg) {
@@ -52,8 +52,11 @@ async function init() {
 
   if (state.globalDisabled) {
     showView('vDisabled');
+    $('userRow').classList.remove('show');
     return;
   }
+
+  updateUserRow(state);
 
   if (state.project) {
     if (tabId) {
@@ -105,6 +108,83 @@ function showShareUrl(url) {
   }
 }
 
+function updateUserRow(state) {
+  const row = $('userRow');
+  if (!state || !state.user) {
+    row.classList.remove('show');
+    return;
+  }
+  row.classList.add('show');
+  $('userActions').style.display = state.isAnonymous ? 'none' : 'flex';
+  $('authRow').style.display = state.isAnonymous ? 'flex' : 'none';
+  if (!state.isAnonymous) {
+    $('userName').textContent = state.userName || 'User';
+    $('userEmail').textContent = state.userEmail || '';
+    $('userAvatar').textContent = state.userName ? state.userName[0].toUpperCase() : 'U';
+  } else {
+    $('userName').textContent = '';
+    $('userEmail').textContent = '';
+    $('userAvatar').textContent = '👤';
+  }
+}
+
+function showAuthError(msg) {
+  const el = $('authError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+function showAuthForm(mode) {
+  showView('vAuth');
+  $('userRow').classList.remove('show');
+  const isSignIn = mode === 'signin';
+  $('authForm').innerHTML = `
+    <div class="auth-title">${isSignIn ? 'Sign In' : 'Sign Up'}</div>
+    <div id="authError" style="display:none;background:#7f1d1d;color:#fecaca;padding:6px 12px;font-size:12px;border-radius:4px;margin-bottom:10px"></div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="authPassword" placeholder="Enter password" autocomplete="${isSignIn ? 'current-password' : 'new-password'}" />
+    </div>
+    ${isSignIn ? '' : '<div class="form-group"><label>Confirm Password</label><input type="password" id="authConfirmPassword" placeholder="Confirm password" autocomplete="new-password" /></div>'}
+    <button class="btn" id="authSubmitBtn">${isSignIn ? 'Sign In' : 'Sign Up'}</button>
+    <div class="sep"></div>
+    <button class="btn btn-google" id="authGoogleBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google
+    </button>
+    <div class="form-toggle">
+      ${isSignIn ? "Don't have an account? " : 'Already have an account? '}
+      <span class="link" id="authToggle">${isSignIn ? 'Sign Up' : 'Sign In'}</span>
+    </div>
+    <div class="sep"></div>
+    <span class="link" id="authBack">Back</span>
+  `;
+    $('authSubmitBtn').addEventListener('click', async () => {
+      const email = $('authEmail').value.trim();
+      const password = $('authPassword').value;
+      if (!email || !password) { showAuthError('Please fill in all fields'); return; }
+      if (!isSignIn && password !== $('authConfirmPassword').value) { showAuthError('Passwords do not match'); return; }
+      $('authSubmitBtn').disabled = true; $('authSubmitBtn').textContent = isSignIn ? 'Signing in…' : 'Signing up…';
+      const tab = await getActiveTab();
+      const type = isSignIn ? 'SIGN_IN_EMAIL' : 'SIGN_UP_EMAIL';
+      const res = await bg({ type, payload: { email, password, tabId: tab?.id } });
+      if (res.ok) { init(); }
+      else { showAuthError(res.error || 'Authentication failed'); $('authSubmitBtn').disabled = false; $('authSubmitBtn').textContent = isSignIn ? 'Sign In' : 'Sign Up'; }
+    });
+    $('authGoogleBtn').addEventListener('click', async () => {
+      $('authGoogleBtn').disabled = true; $('authGoogleBtn').textContent = 'Connecting…';
+      const tab = await getActiveTab();
+      const res = await bg({ type: 'SIGN_IN_GOOGLE', payload: { tabId: tab?.id } });
+      if (res.ok) { init(); }
+      else { showAuthError(res.error || 'Google sign-in failed.'); $('authGoogleBtn').disabled = false; $('authGoogleBtn').innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google'; }
+    });
+  $('authToggle').addEventListener('click', () => showAuthForm(isSignIn ? 'signup' : 'signin'));
+  $('authBack').addEventListener('click', () => init());
+}
+
 function showActiveView(state) {
   console.log('[Popup] showActiveView', { project: state.project?.id, user: state.user?.id, isAnonymous: state.isAnonymous, url: state.url, title: state.title });
   console.log('[Popup] showActiveView check — !isAnonymous:', !state.isAnonymous, 'user truthy:', !!state.user, 'result:', !state.isAnonymous && state.user);
@@ -138,31 +218,8 @@ function showActiveView(state) {
   } else {
     shareSection.innerHTML = `
       <div class="share-box">
-        <div class="share-msg">Save your review to share it.<br />Authenticate with Google to generate a shareable link.</div>
-        <button class="btn btn-google" id="googleAuthBtn">
-          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
-          Continue with Google
-        </button>
+        <div class="share-msg">Click Share above to generate a share link.<br />You can share anonymously or sign in with Google.</div>
       </div>`;
-    const ga = shareSection.querySelector('#googleAuthBtn');
-    if (ga) {
-      ga.addEventListener('click', async () => {
-        ga.disabled = true;
-        ga.textContent = 'Connecting…';
-        const res = await bg({ type: 'SIGN_IN_GOOGLE' });
-        if (res.ok) {
-          if (res.shareUrl) {
-            showShareUrl(res.shareUrl);
-          } else {
-            showActiveView({ project: state.project, user: res.user, isAnonymous: false, url: state.url, title: state.title });
-          }
-        } else {
-          showError(res.error || 'Google sign-in failed.');
-          ga.disabled = false;
-          ga.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google';
-        }
-      });
-    }
   }
 }
 
@@ -182,7 +239,9 @@ $('stopReviewBtn').addEventListener('click', async () => {
   clearError();
   const tab = await getActiveTab();
   await bg({ type: 'STOP_REVIEW', payload: { tabId: tab?.id } });
-  showWelcomeView({ user: (await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } })).user });
+  const s = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
+  updateUserRow(s);
+  showWelcomeView(s);
 });
 
 $('shareBtn').addEventListener('click', async () => {
@@ -190,25 +249,57 @@ $('shareBtn').addEventListener('click', async () => {
   const tab = await getActiveTab();
   const tabId = tab?.id;
 
-  // First ask background to set pendingShare (this also returns needsAuth if anon)
   let res = await bg({ type: 'SHARE', payload: { tabId } });
   console.log('[Popup] shareBtn — initial SHARE response:', res);
 
   if (res.ok && res.needsAuth) {
-    const ga = $('googleAuthBtn');
-    if (ga) {
-      ga.disabled = true;
-      ga.textContent = 'Connecting…';
-    }
-    const authRes = await bg({ type: 'SIGN_IN_GOOGLE' });
-    console.log('[Popup] shareBtn — SIGN_IN_GOOGLE response:', authRes);
-    if (authRes.ok && authRes.shareUrl) {
-      showShareUrl(authRes.shareUrl);
-    } else if (authRes.ok) {
-      showError('Google sign-in succeeded but no share URL was generated. Try clicking Share again.');
-    } else if (authRes.ok === false) {
-      showError(authRes.error || 'Google sign-in failed.');
-    }
+    const shareSection = $('shareSection');
+    shareSection.innerHTML = `
+      <div class="share-box">
+        <button class="btn btn-google" id="googleChoiceBtn">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
+          Sign in with Google
+        </button>
+        <div class="sep"></div>
+        <button class="btn btn-sm btn-outline" id="guestChoiceBtn">Share Anonymously</button>
+      </div>`;
+
+    const googleBtn = shareSection.querySelector('#googleChoiceBtn');
+    const guestBtn = shareSection.querySelector('#guestChoiceBtn');
+
+    googleBtn.addEventListener('click', async () => {
+      googleBtn.disabled = true;
+      googleBtn.textContent = 'Connecting…';
+      guestBtn.style.display = 'none';
+      const authRes = await bg({ type: 'SIGN_IN_GOOGLE' });
+      console.log('[Popup] shareBtn — SIGN_IN_GOOGLE response:', authRes);
+      if (authRes.ok && authRes.shareUrl) {
+        showShareUrl(authRes.shareUrl);
+      } else if (authRes.ok) {
+        showError('Google sign-in succeeded but no share URL was generated. Try clicking Share again.');
+      } else {
+        showError(authRes.error || 'Google sign-in failed.');
+        googleBtn.disabled = false;
+        googleBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg> Sign in with Google';
+        guestBtn.style.display = '';
+      }
+    });
+
+    guestBtn.addEventListener('click', async () => {
+      guestBtn.disabled = true;
+      guestBtn.textContent = 'Sharing…';
+      googleBtn.style.display = 'none';
+      const guestRes = await bg({ type: 'SHARE_AS_GUEST', payload: { tabId } });
+      console.log('[Popup] shareBtn — SHARE_AS_GUEST response:', guestRes);
+      if (guestRes.ok && guestRes.shareUrl) {
+        showShareUrl(guestRes.shareUrl);
+      } else {
+        showError(guestRes.error || 'Failed to generate share link.');
+        guestBtn.disabled = false;
+        guestBtn.textContent = 'Share Anonymously';
+        googleBtn.style.display = '';
+      }
+    });
     return;
   }
 
@@ -221,7 +312,20 @@ $('shareBtn').addEventListener('click', async () => {
 
 $('resetLink').addEventListener('click', async () => {
   await bg({ type: 'SIGN_OUT' });
+  updateUserRow({ user: null });
   showWelcomeView({});
 });
+
+$('signOutLink').addEventListener('click', async () => {
+  await bg({ type: 'SIGN_OUT' });
+  updateUserRow({ user: null });
+  init();
+});
+
+$('settingsLink').addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+});
+
+$('upgradeBtn').addEventListener('click', () => showAuthForm('signin'));
 
 init();

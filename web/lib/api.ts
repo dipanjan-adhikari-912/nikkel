@@ -8,17 +8,8 @@ export interface SharedProject {
   commentCount: number
 }
 
-const RAW = process.env.NEXT_PUBLIC_API_URL
-if (!RAW) {
-  throw new Error(
-    'NEXT_PUBLIC_API_URL is not configured.\n' +
-    'Create web/.env.local and set NEXT_PUBLIC_API_URL to your API server URL.'
-  )
-}
-const API_BASE = RAW.replace(/\/+$/, '')
-
 export async function getSharedProject(shareId: string): Promise<SharedProject> {
-  const res = await fetch(`${API_BASE}/api/projects/share/${encodeURIComponent(shareId)}`, {
+  const res = await fetch(`/api/projects/share/${encodeURIComponent(shareId)}`, {
     next: { revalidate: 60 },
   })
 

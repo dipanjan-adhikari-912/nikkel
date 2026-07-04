@@ -12,6 +12,24 @@ export class AuthService {
     };
   }
 
+  async signUpWithEmail(email, password) {
+    const result = await this._repo.signUpWithEmail(email, password);
+    return {
+      user: result.user,
+      token: result.token,
+      refreshToken: result.refreshToken,
+    };
+  }
+
+  async signInWithEmail(email, password) {
+    const result = await this._repo.signInWithEmail(email, password);
+    return {
+      user: result.user,
+      token: result.token,
+      refreshToken: result.refreshToken,
+    };
+  }
+
   async exchangeGoogleToken(idToken) {
     const result = await this._repo.exchangeGoogleToken(idToken);
     return {

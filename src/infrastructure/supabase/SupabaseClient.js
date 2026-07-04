@@ -79,6 +79,20 @@ export class SupabaseClient {
     });
   }
 
+  async authSignUpWithEmail(email, password) {
+    return this.request('/auth/v1/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async authSignInWithEmail(email, password) {
+    return this.request('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
   async authExchangeGoogleToken(idToken) {
     return this.request('/auth/v1/token?grant_type=id_token', {
       method: 'POST',
