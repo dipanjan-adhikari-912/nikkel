@@ -18,7 +18,7 @@ if (!RAW) {
 const API_BASE = RAW.replace(/\/+$/, '')
 
 export async function getSharedProject(shareId: string): Promise<SharedProject> {
-  const res = await fetch(`${API_BASE}/projects/share/${encodeURIComponent(shareId)}`, {
+  const res = await fetch(`${API_BASE}/api/projects/share/${encodeURIComponent(shareId)}`, {
     next: { revalidate: 60 },
   })
 

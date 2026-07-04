@@ -220,7 +220,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!nikkelId || !text) return { ok: false, error: 'Missing nikkelId or text' };
         try {
           const authorName = globalState.user?.user_metadata?.full_name || 'Anonymous';
-          const res = await fetch(`${API_URL}/comments`, {
+          const res = await fetch(`${API_URL}/api/comments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nikkelId, text, authorName }),
@@ -300,7 +300,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const { shareId } = msg.payload || {};
         if (!shareId) return { ok: false, error: 'No shareId provided' };
 
-        const boardRes = await fetch(`${API_URL}/board/${encodeURIComponent(shareId)}`);
+        const boardRes = await fetch(`${API_URL}/api/board/${encodeURIComponent(shareId)}`);
         if (!boardRes.ok) return { ok: false, error: 'Project not found' };
         const board = await boardRes.json();
         const boardProject = board.project;
