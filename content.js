@@ -2,6 +2,10 @@
 if (window.__nikkelLoaded) return;
 window.__nikkelLoaded = true;
 
+console.log('[Nikkel] content script injected', location.href);
+
+document.documentElement.dataset.nikkelExtension = '1';
+
 console.log('[Nikkel] content script loaded');
 
 function isValid() {
@@ -436,7 +440,7 @@ function removeBar() {
   currentMode = 'browse';
 }
 
-function injectCommentBubble(pageX, pageY, elementInfo) {
+function injectCommentBubble(cx, cy, elementInfo) {
   removeCommentBubble();
   commentHost = createShadowHost('nikkel-comment-host');
   const shadow = commentHost.attachShadow({ mode: 'open' });
@@ -449,17 +453,15 @@ function injectCommentBubble(pageX, pageY, elementInfo) {
 
   if (cbEl) cbEl.textContent = `<${elementInfo.tag}> ${elementInfo.elementText || ''}`;
 
-  // Position bubble near the pin (pin center is at pageX, pageY; pin radius = 13)
-  const pinRadius = 13;
   const margin = 8;
-  let x = pageX + pinRadius + margin;
-  let y = pageY - pinRadius;
   const bw = 284;
   const bh = 140;
-  if (x + bw + 10 > window.innerWidth) x = pageX - pinRadius - margin - bw;
-  if (y + bh + 10 > window.innerHeight) y = window.innerHeight - bh - 10;
-  if (x < 10) x = 10;
-  if (y < 10) y = 10;
+  let x = cx + margin;
+  let y = cy - Math.round(bh / 2);
+  if (x + bw + margin > window.innerWidth) x = cx - margin - bw;
+  if (y + bh + margin > window.innerHeight) y = cy - bh - margin;
+  if (x < margin) x = margin;
+  if (y < margin) y = margin;
   commentHost.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647`;
 
   if (cbTa) cbTa.focus();
@@ -773,10 +775,12 @@ async function handleDocumentClick(e) {
   if (popoverHost) removePopover();
 
   const info = getElementInfo(target);
-  const pageX = Math.round(e.clientX + window.scrollX);
-  const pageY = Math.round(e.clientY + window.scrollY);
+  const clientX = e.clientX;
+  const clientY = e.clientY;
+  const pageX = Math.round(clientX + window.scrollX);
+  const pageY = Math.round(clientY + window.scrollY);
 
-  const result = await injectCommentBubble(pageX, pageY, info);
+  const result = await injectCommentBubble(clientX, clientY, info);
   if (!result) return;
 
   const nikkel = {
@@ -967,6 +971,8 @@ setInterval(checkUrlChange, 1000);
 
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'PING') {
+    console.log('[Nikkel] received PING');
+    console.log('[Nikkel] sending PONG');
     window.postMessage({ type: 'PONG', source: 'nikkel-extension' }, '*');
   }
   if (event.data?.type === 'NIKKEL_PING') {
@@ -1010,4 +1016,6 @@ window.addEventListener('message', (event) => {
     }
   }
 });
+console.log('[Nikkel] listener registered');
+window.postMessage({ type: 'NIKKEL_EXTENSION_READY', source: 'nikkel-extension' }, '*');
 })();

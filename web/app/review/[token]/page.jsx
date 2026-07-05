@@ -28,18 +28,23 @@ export default function ReviewPage({ params }) {
   }, [params.token])
 
   useEffect(() => {
-    function pongHandler(event) {
-      if (event.data?.type === 'PONG' && event.data?.source === 'nikkel-extension') {
+    function handler(event) {
+      if (event.data?.source === 'nikkel-extension') {
+        console.log('[Nikkel Web] detected extension', event.data?.type);
         setExtensionDetected(true)
       }
     }
-    window.addEventListener('message', pongHandler)
-    window.postMessage({ type: 'PING' }, '*')
-    const timer = setTimeout(() => window.removeEventListener('message', pongHandler), 1000)
-    return () => {
-      window.removeEventListener('message', pongHandler)
-      clearTimeout(timer)
+    window.addEventListener('message', handler)
+    if (document.documentElement.dataset.nikkelExtension) {
+      console.log('[Nikkel Web] dataset attribute found');
+      setExtensionDetected(true)
+      return () => window.removeEventListener('message', handler)
     }
+    console.log('[Nikkel Web] sent PING');
+    window.postMessage({ type: 'PING' }, '*')
+    const interval = setInterval(() => window.postMessage({ type: 'PING' }, '*'), 300)
+    const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
+    return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
   }, [])
 
   useEffect(() => {
@@ -106,14 +111,12 @@ export default function ReviewPage({ params }) {
     )
   }
 
-  const { review, project, nikkels } = data
+  const { review, project, nikkels, owner } = data
   const pinCount = nikkels?.length || 0
   const created = new Date(review.created_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
   })
-  const ownerDisplay = review.owner_id
-    ? review.owner_id.slice(0, 8) + '...'
-    : 'Anonymous'
+  const ownerDisplay = owner?.email || owner?.name || 'Guest'
   const pageUrl = project.url || project.base_url || ''
 
   return (

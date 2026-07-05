@@ -7,25 +7,34 @@ export class ShareService {
   }
 
   async ensureProjectReview(projectId, userId, token) {
+    const sub = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
+    console.log('[ShareService] ensureProjectReview', { projectId, userId, tokenSub: sub });
     try {
       const existing = await this._client.request(`/rest/v1/reviews?project_id=eq.${projectId}&order=created_at.desc&limit=1`, { token });
       const rows = Array.isArray(existing) ? existing : [];
-      if (rows.length > 0) return rows[0];
+      if (rows.length > 0) {
+        console.log('[ShareService] found existing review', { reviewId: rows[0].id, owner_id: rows[0].owner_id });
+        return rows[0];
+      }
+      console.log('[ShareService] no existing review, will create');
     } catch (e) {
       console.warn('[ShareService] Error checking reviews', e.message);
     }
     try {
+      const body = { project_id: projectId, owner_id: userId };
+      console.log('[ShareService] creating review', { body, tokenSub: sub });
       const data = await this._client.request('/rest/v1/reviews', {
         method: 'POST',
         token,
         prefer: 'return=representation',
-        body: JSON.stringify({ project_id: projectId, owner_id: userId }),
+        body: JSON.stringify(body),
       });
       const review = Array.isArray(data) ? data[0] : data;
       if (!review) {
         console.error('[ShareService] createReview returned empty');
         return null;
       }
+      console.log('[ShareService] review created', { reviewId: review.id, owner_id: review.owner_id });
       return review;
     } catch (e) {
       console.error('[ShareService] Failed to create review', e.message);
