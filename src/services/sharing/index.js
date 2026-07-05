@@ -6,9 +6,9 @@ export class ShareService {
     this._projectRepo = projectRepository;
   }
 
-  async ensureProjectReview(projectId, userId, token) {
+  async ensureProjectReview(projectId, userId, token, sharedBy = {}) {
     const sub = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
-    console.log('[ShareService] ensureProjectReview', { projectId, userId, tokenSub: sub });
+    console.log('[ShareService] ensureProjectReview', { projectId, userId, tokenSub: sub, sharedBy });
     try {
       const existing = await this._client.request(`/rest/v1/reviews?project_id=eq.${projectId}&order=created_at.desc&limit=1`, { token });
       const rows = Array.isArray(existing) ? existing : [];
@@ -22,6 +22,9 @@ export class ShareService {
     }
     try {
       const body = { project_id: projectId, owner_id: userId };
+      if (sharedBy.name) body.shared_by_name = sharedBy.name;
+      if (sharedBy.email) body.shared_by_email = sharedBy.email;
+      if (sharedBy.avatar) body.shared_by_avatar = sharedBy.avatar;
       console.log('[ShareService] creating review', { body, tokenSub: sub });
       const data = await this._client.request('/rest/v1/reviews', {
         method: 'POST',
@@ -34,7 +37,7 @@ export class ShareService {
         console.error('[ShareService] createReview returned empty');
         return null;
       }
-      console.log('[ShareService] review created', { reviewId: review.id, owner_id: review.owner_id });
+      console.log('[ShareService] review created', { reviewId: review.id, owner_id: review.owner_id, sharedByFields: { name: review.shared_by_name, email: review.shared_by_email } });
       return review;
     } catch (e) {
       console.error('[ShareService] Failed to create review', e.message);

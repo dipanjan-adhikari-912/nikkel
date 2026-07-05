@@ -67,6 +67,11 @@ create policy "Owners can update own reviews"
 create index if not exists reviews_share_token_idx on reviews (share_token);
 create index if not exists reviews_project_id_idx on reviews (project_id);
 
+-- Add sender info for public review pages
+alter table reviews add column if not exists shared_by_name text;
+alter table reviews add column if not exists shared_by_email text;
+alter table reviews add column if not exists shared_by_avatar text;
+
 -- Nikkels (pins belong to a review, which belongs to a project)
 create table nikkels (
   id uuid primary key default gen_random_uuid(),

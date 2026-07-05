@@ -149,17 +149,34 @@ async function completeUpgrade(anonToken, anonUserId, tabIdOverride) {
         method: 'PATCH', token: anonToken,
         body: JSON.stringify({ owner_id: globalState.user.id }),
       });
+      const meta = globalState.user?.user_metadata || {};
+      const sharedBy = {
+        shared_by_name: meta.full_name || meta.name || null,
+        shared_by_email: globalState.user?.email || null,
+        shared_by_avatar: meta.avatar_url || meta.picture || meta.avatar || null,
+      };
+      console.log('[BG] completeUpgrade — PATCH review shared_by fields', sharedBy);
+      await supabaseClient.request(`/rest/v1/reviews?id=eq.${anonReview.id}`, {
+        method: 'PATCH', token: anonToken,
+        body: JSON.stringify(sharedBy),
+      });
       ts.review = anonReview;
       ts.review.owner_id = globalState.user.id;
-      console.log('[BG] completeUpgrade — review ownership transferred');
+      console.log('[BG] completeUpgrade — review ownership + shared_by transferred');
     }
   } catch (e) {
     console.warn('[BG] Failed to transfer review ownership', e.message);
   }
-  console.log('[BG] completeUpgrade — calling ensureProjectReview with Google token (sub:', jwtSub(globalState.token), ')');
-  let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
+  const meta = globalState.user?.user_metadata || {};
+  const sharedBy = {
+    name: meta.full_name || meta.name || null,
+    email: globalState.user?.email || null,
+    avatar: meta.avatar_url || meta.picture || meta.avatar || null,
+  };
+  console.log('[BG] completeUpgrade — calling ensureProjectReview with Google token (sub:', jwtSub(globalState.token), ') and sharedBy:', sharedBy);
+  let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token, sharedBy);
   if (!review) return null;
-  console.log('[BG] completeUpgrade — final review', { reviewId: review.id, owner_id: review.owner_id });
+  console.log('[BG] completeUpgrade — final review', { reviewId: review.id, owner_id: review.owner_id, shared_by_email: review.shared_by_email });
   ts.review = review;
   const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
   const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
@@ -229,8 +246,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         const project = await projectService.create(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
         console.log('[BG] START_REVIEW — project created', { projectId: project.id, owner_id: project.ownerId || project.owner_id });
-        const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token);
-        console.log('[BG] START_REVIEW — review result', { reviewId: review?.id, owner_id: review?.owner_id });
+        const meta = globalState.user?.user_metadata || {};
+        const sharedBy = globalState.isAnonymous ? {} : {
+          name: meta.full_name || meta.name || null,
+          email: globalState.user?.email || null,
+          avatar: meta.avatar_url || meta.picture || meta.avatar || null,
+        };
+        const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token, sharedBy);
+        console.log('[BG] START_REVIEW — review result', { reviewId: review?.id, owner_id: review?.owner_id, shared_by_email: review?.shared_by_email });
         if (!review) console.error('[BG] START_REVIEW: ensureProjectReview returned null — review not created');
         const tab = getTabState(tId);
         tab.project = project;
@@ -407,7 +430,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         console.log('[BG] SIGN_IN_GOOGLE — Google user info', { id: userInfo.id, email: userInfo.email, name: userInfo.name });
         supabaseClient.setTokens(accessToken, refreshToken);
         setAuthenticatedUser(userInfo, accessToken, refreshToken);
-        console.log('[BG] SIGN_IN_GOOGLE — after setAuthenticatedUser', { user: globalState.user?.id, email: globalState.user?.email, JWT sub: jwtSub(globalState.token) });
+        console.log('[BG] SIGN_IN_GOOGLE — after setAuthenticatedUser', { user: globalState.user?.id, email: globalState.user?.email, 'JWT sub': jwtSub(globalState.token) });
 
         const shareUrl = await completeUpgrade(anonToken, anonUserId, tabId);
         if (shareUrl) return { ok: true, user: globalState.user, shareUrl };
@@ -570,12 +593,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return { ok: true, needsAuth: true };
         }
 
-        let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
+        const meta = globalState.user?.user_metadata || {};
+        const sharedBy = {
+          name: meta.full_name || meta.name || null,
+          email: globalState.user?.email || null,
+          avatar: meta.avatar_url || meta.picture || meta.avatar || null,
+        };
+        let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token, sharedBy);
         if (!review) {
           console.error('[BG] SHARE: ensureProjectReview returned null');
           return { ok: false, error: 'Failed to create review' };
         }
-        console.log('[BG] SHARE — review', { reviewId: review.id, owner_id: review.owner_id, reused: !!tab.review?.id });
+        if (!review.shared_by_email && sharedBy.email) {
+          const patchBody = {
+            shared_by_name: sharedBy.name,
+            shared_by_email: sharedBy.email,
+            shared_by_avatar: sharedBy.avatar,
+          };
+          console.log('[BG] SHARE — PATCH review shared_by fields', patchBody);
+          try {
+            await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, {
+              method: 'PATCH', token: globalState.token,
+              body: JSON.stringify(patchBody),
+            });
+            review.shared_by_name = patchBody.shared_by_name;
+            review.shared_by_email = patchBody.shared_by_email;
+            review.shared_by_avatar = patchBody.shared_by_avatar;
+          } catch (e) {
+            console.warn('[BG] SHARE — failed to PATCH shared_by', e.message);
+          }
+        }
+        console.log('[BG] SHARE — review', { reviewId: review.id, owner_id: review.owner_id, shared_by_email: review.shared_by_email, reused: !!tab.review?.id });
         tab.review = review;
 
         const shareToken = await shareService.ensureShareToken(review.id, globalState.token);

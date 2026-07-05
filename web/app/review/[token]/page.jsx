@@ -111,12 +111,12 @@ export default function ReviewPage({ params }) {
     )
   }
 
-  const { review, project, nikkels, owner } = data
+  const { review, project, nikkels } = data
   const pinCount = nikkels?.length || 0
   const created = new Date(review.created_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
   })
-  const ownerDisplay = owner?.email || owner?.name || 'Guest'
+  const senderDisplay = review.shared_by_email || review.shared_by_name || 'Guest'
   const pageUrl = project.url || project.base_url || ''
 
   return (
@@ -156,7 +156,7 @@ export default function ReviewPage({ params }) {
           marginBottom: 24
         }}>
           <StatRow label="Number of Pins" value={pinCount.toString()} />
-          <StatRow label="Owner" value={ownerDisplay} />
+          <StatRow label="Owner" value={senderDisplay} />
           <StatRow label="Created" value={created} />
         </div>
 
