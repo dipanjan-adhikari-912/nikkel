@@ -42,7 +42,17 @@ export default function ReviewPage({ params }) {
     }
     console.log('[Nikkel Web] sent PING');
     window.postMessage({ type: 'PING' }, '*')
-    const interval = setInterval(() => window.postMessage({ type: 'PING' }, '*'), 300)
+    const interval = setInterval(() => {
+      if (document.documentElement.dataset.nikkelExtension) {
+        console.log('[Nikkel Web] dataset attribute found (poll)');
+        setExtensionDetected(true)
+        clearInterval(interval)
+        clearTimeout(timer)
+        window.removeEventListener('message', handler)
+        return
+      }
+      window.postMessage({ type: 'PING' }, '*')
+    }, 300)
     const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
     return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
   }, [])
