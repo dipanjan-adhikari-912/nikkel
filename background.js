@@ -112,6 +112,28 @@ async function sendToTab(tabId, msg, retries = 5) {
   return null;
 }
 
+async function upsertProfile(user, token) {
+  if (!user || !token) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles?on_conflict=id`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON, Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar_url: user.avatarUrl,
+      }),
+    });
+  } catch (e) {
+    console.warn('[BG] Failed to upsert profile', e.message);
+  }
+}
+
 let ready = loadState();
 
 async function completeUpgrade(anonToken, anonUserId, tabIdOverride) {
@@ -149,34 +171,16 @@ async function completeUpgrade(anonToken, anonUserId, tabIdOverride) {
         method: 'PATCH', token: anonToken,
         body: JSON.stringify({ owner_id: globalState.user.id }),
       });
-      const meta = globalState.user?.user_metadata || {};
-      const sharedBy = {
-        shared_by_name: meta.full_name || meta.name || null,
-        shared_by_email: globalState.user?.email || null,
-        shared_by_avatar: meta.avatar_url || meta.picture || meta.avatar || null,
-      };
-      console.log('[BG] completeUpgrade — PATCH review shared_by fields', sharedBy);
-      await supabaseClient.request(`/rest/v1/reviews?id=eq.${anonReview.id}`, {
-        method: 'PATCH', token: anonToken,
-        body: JSON.stringify(sharedBy),
-      });
       ts.review = anonReview;
       ts.review.owner_id = globalState.user.id;
-      console.log('[BG] completeUpgrade — review ownership + shared_by transferred');
+      console.log('[BG] completeUpgrade — review ownership transferred');
     }
   } catch (e) {
     console.warn('[BG] Failed to transfer review ownership', e.message);
   }
-  const meta = globalState.user?.user_metadata || {};
-  const sharedBy = {
-    name: meta.full_name || meta.name || null,
-    email: globalState.user?.email || null,
-    avatar: meta.avatar_url || meta.picture || meta.avatar || null,
-  };
-  console.log('[BG] completeUpgrade — calling ensureProjectReview with Google token (sub:', jwtSub(globalState.token), ') and sharedBy:', sharedBy);
-  let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token, sharedBy);
+  let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
   if (!review) return null;
-  console.log('[BG] completeUpgrade — final review', { reviewId: review.id, owner_id: review.owner_id, shared_by_email: review.shared_by_email });
+  console.log('[BG] completeUpgrade — final review', { reviewId: review.id, owner_id: review.owner_id });
   ts.review = review;
   const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
   const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
@@ -246,14 +250,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         const project = await projectService.create(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
         console.log('[BG] START_REVIEW — project created', { projectId: project.id, owner_id: project.ownerId || project.owner_id });
-        const meta = globalState.user?.user_metadata || {};
-        const sharedBy = globalState.isAnonymous ? {} : {
-          name: meta.full_name || meta.name || null,
-          email: globalState.user?.email || null,
-          avatar: meta.avatar_url || meta.picture || meta.avatar || null,
-        };
-        const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token, sharedBy);
-        console.log('[BG] START_REVIEW — review result', { reviewId: review?.id, owner_id: review?.owner_id, shared_by_email: review?.shared_by_email });
+        const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token);
+        console.log('[BG] START_REVIEW — review result', { reviewId: review?.id, owner_id: review?.owner_id });
         if (!review) console.error('[BG] START_REVIEW: ensureProjectReview returned null — review not created');
         const tab = getTabState(tId);
         tab.project = project;
@@ -340,7 +338,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const { nikkelId, text } = msg.payload || {};
         if (!nikkelId || !text) return { ok: false, error: 'Missing nikkelId or text' };
         try {
-          const authorName = globalState.user?.user_metadata?.full_name || 'Anonymous';
+          const authorName = globalState.user?.name || 'Anonymous';
           const supabaseRes = await fetch(`${SUPABASE_URL}/rest/v1/replies`, {
             method: 'POST',
             headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json', Authorization: `Bearer ${globalState.token}`, Prefer: 'return=representation' },
@@ -359,21 +357,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
       }
 
-      case 'SHARE_AS_GUEST': {
-        const srcTabIdG = msg.payload?.tabId || tabId;
-        if (!srcTabIdG) return { ok: false, error: 'No tab context' };
-        const tabG = getTabState(srcTabIdG);
-        if (!tabG.project) return { ok: false, error: 'No active project' };
-        let reviewG = await shareService.ensureProjectReview(tabG.project.id, globalState.user?.id, globalState.token);
-        if (!reviewG) return { ok: false, error: 'Failed to create review' };
-        tabG.review = reviewG;
-        const shareTokenG = await shareService.ensureShareToken(reviewG.id, globalState.token);
-        const shareUrlG = `${VIEWER_BASE}/review/${shareTokenG}`;
-    pendingShare = null;
-    await saveState();
-    return { ok: true, shareUrl: shareUrlG };
-      }
-
       case 'SIGN_UP_EMAIL': {
         const { email: regEmail, password: regPassword } = msg.payload || {};
         if (!regEmail || !regPassword) return { ok: false, error: 'Email and password required' };
@@ -384,6 +367,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         catch (e) { return { ok: false, error: e.message }; }
         setAuthenticatedUser(regResult.user, regResult.token, regResult.refreshToken);
         supabaseClient.setTokens(regResult.token, regResult.refreshToken);
+        await upsertProfile(globalState.user, globalState.token);
         const shareUrlReg = await completeUpgrade(anonTokenReg, anonUserIdReg, tabId);
         if (shareUrlReg) return { ok: true, user: globalState.user, shareUrl: shareUrlReg };
         await saveState();
@@ -400,6 +384,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         catch (e) { return { ok: false, error: e.message }; }
         setAuthenticatedUser(signResult.user, signResult.token, signResult.refreshToken);
         supabaseClient.setTokens(signResult.token, signResult.refreshToken);
+        await upsertProfile(globalState.user, globalState.token);
         const shareUrlSign = await completeUpgrade(anonTokenSign, anonUserIdSign, tabId);
         if (shareUrlSign) return { ok: true, user: globalState.user, shareUrl: shareUrlSign };
         await saveState();
@@ -431,6 +416,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         supabaseClient.setTokens(accessToken, refreshToken);
         setAuthenticatedUser(userInfo, accessToken, refreshToken);
         console.log('[BG] SIGN_IN_GOOGLE — after setAuthenticatedUser', { user: globalState.user?.id, email: globalState.user?.email, 'JWT sub': jwtSub(globalState.token) });
+        await upsertProfile(globalState.user, globalState.token);
 
         const shareUrl = await completeUpgrade(anonToken, anonUserId, tabId);
         if (shareUrl) return { ok: true, user: globalState.user, shareUrl };
@@ -507,16 +493,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'TOGGLE_DISABLED': {
         globalState.globalDisabled = msg.payload?.disabled;
-        if (globalState.globalDisabled) {
-          for (const [id, t] of tabState) {
-            if (t.project) {
-              t.project = null;
-              t.nikkels = [];
-              t.mode = 'idle';
-              try { chrome.tabs.sendMessage(id, { type: 'DEACTIVATE' }); } catch {}
-            }
-          }
+        pendingShare = null;
+        for (const [id] of tabState) {
+          try { chrome.tabs.sendMessage(id, { type: 'DEACTIVATE' }); } catch {}
         }
+        tabState.clear();
         await saveState();
         return { ok: true, globalDisabled: globalState.globalDisabled };
       }
@@ -583,6 +564,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
         if (!tab.project) return { ok: false, error: 'No active project' };
+        if (!tab.nikkels || tab.nikkels.length === 0) return { ok: false, error: 'Add at least one pin before sharing' };
         console.log('[BG] SHARE — isAnonymous:', globalState.isAnonymous, 'user.id:', globalState.user?.id, 'user.email:', globalState.user?.email, 'JWT sub:', jwtSub(globalState.token));
         console.log('[BG] SHARE — tab state', { projectId: tab.project.id, projectOwnerId: tab.project.ownerId || tab.project.owner_id, reviewOwnerId: tab.review?.owner_id, reviewId: tab.review?.id });
 
@@ -593,37 +575,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return { ok: true, needsAuth: true };
         }
 
-        const meta = globalState.user?.user_metadata || {};
-        const sharedBy = {
-          name: meta.full_name || meta.name || null,
-          email: globalState.user?.email || null,
-          avatar: meta.avatar_url || meta.picture || meta.avatar || null,
-        };
-        let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token, sharedBy);
+        let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
         if (!review) {
           console.error('[BG] SHARE: ensureProjectReview returned null');
           return { ok: false, error: 'Failed to create review' };
         }
-        if (!review.shared_by_email && sharedBy.email) {
-          const patchBody = {
-            shared_by_name: sharedBy.name,
-            shared_by_email: sharedBy.email,
-            shared_by_avatar: sharedBy.avatar,
-          };
-          console.log('[BG] SHARE — PATCH review shared_by fields', patchBody);
-          try {
-            await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, {
-              method: 'PATCH', token: globalState.token,
-              body: JSON.stringify(patchBody),
-            });
-            review.shared_by_name = patchBody.shared_by_name;
-            review.shared_by_email = patchBody.shared_by_email;
-            review.shared_by_avatar = patchBody.shared_by_avatar;
-          } catch (e) {
-            console.warn('[BG] SHARE — failed to PATCH shared_by', e.message);
-          }
-        }
-        console.log('[BG] SHARE — review', { reviewId: review.id, owner_id: review.owner_id, shared_by_email: review.shared_by_email, reused: !!tab.review?.id });
+        console.log('[BG] SHARE — review', { reviewId: review.id, owner_id: review.owner_id, reused: !!tab.review?.id });
         tab.review = review;
 
         const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
@@ -675,6 +632,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           const updatedUser = await authService.getUserInfo(globalState.token);
           setAuthenticatedUser(updatedUser, globalState.token, globalState.refreshToken);
+          await upsertProfile(globalState.user, globalState.token);
           await saveState();
           return { ok: true, user: globalState.user };
         } catch (e) {

@@ -72,6 +72,30 @@ alter table reviews add column if not exists shared_by_name text;
 alter table reviews add column if not exists shared_by_email text;
 alter table reviews add column if not exists shared_by_avatar text;
 
+-- Profiles (sender identity for public review pages, populated on Google sign-in)
+create table if not exists profiles (
+  id uuid primary key references auth.users on delete cascade,
+  name text,
+  email text,
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table profiles enable row level security;
+
+create policy if not exists "Anyone can view profiles"
+  on profiles for select
+  using (true);
+
+create policy if not exists "Users can insert own profile"
+  on profiles for insert
+  with check (auth.uid() = id);
+
+create policy if not exists "Users can update own profile"
+  on profiles for update
+  using (auth.uid() = id);
+
 -- Nikkels (pins belong to a review, which belongs to a project)
 create table nikkels (
   id uuid primary key default gen_random_uuid(),

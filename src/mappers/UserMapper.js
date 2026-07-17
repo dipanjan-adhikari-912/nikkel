@@ -15,6 +15,7 @@ export class UserMapper {
       id: authUser.id,
       email: authUser.email || null,
       name: (authUser.user_metadata?.full_name || authUser.user_metadata?.name || null),
+      avatarUrl: (authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || authUser.user_metadata?.avatar || null),
       isAnonymous: false,
     });
   }

@@ -111,12 +111,12 @@ export default function ReviewPage({ params }) {
     )
   }
 
-  const { review, project, nikkels } = data
+  const { review, project, nikkels, owner } = data
   const pinCount = nikkels?.length || 0
   const created = new Date(review.created_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric'
   })
-  const senderDisplay = review.shared_by_email || review.shared_by_name || 'Guest'
+  const senderDisplay = owner?.email || owner?.name || 'Guest'
   const pageUrl = project.url || project.base_url || ''
 
   return (

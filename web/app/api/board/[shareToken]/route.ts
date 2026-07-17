@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/server/supabase'
 
+async function getProfile(userId: string | null) {
+  if (!userId) return null
+  const { data } = await db.from('profiles').select('name, email, avatar_url').eq('id', userId).single()
+  return data || null
+}
+
 export async function GET(request: NextRequest, { params }: { params: { shareToken: string } }) {
   try {
     const { data: review, error: reviewError } = await db
@@ -43,7 +49,8 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
 
       if (nikkelError) return NextResponse.json({ error: nikkelError.message }, { status: 500 })
 
-      return NextResponse.json({ review: fullReview, project: fullReview.projects, nikkels: nikkels || [] })
+      const owner = await getProfile(fullReview.owner_id)
+      return NextResponse.json({ review: fullReview, project: fullReview.projects, owner, nikkels: nikkels || [] })
     }
 
     const { data: nikkels, error: nikkelError } = await db
@@ -54,7 +61,8 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
 
     if (nikkelError) return NextResponse.json({ error: nikkelError.message }, { status: 500 })
 
-    return NextResponse.json({ review, project: review.projects, nikkels: nikkels || [] })
+    const owner = await getProfile(review.owner_id)
+    return NextResponse.json({ review, project: review.projects, owner, nikkels: nikkels || [] })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

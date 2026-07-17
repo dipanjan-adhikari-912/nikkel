@@ -1,8 +1,9 @@
 export class User {
-  constructor({ id, email, name, isAnonymous }) {
+  constructor({ id, email, name, avatarUrl, isAnonymous }) {
     this.id = id;
     this.email = email || null;
     this.name = name || null;
+    this.avatarUrl = avatarUrl || null;
     this.isAnonymous = isAnonymous !== false;
   }
 
