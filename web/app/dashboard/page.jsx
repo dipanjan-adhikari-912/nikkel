@@ -42,7 +42,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!token) return
-    api(token, '/auth/me').then(setUser).catch(() => setToken(null))
+    api(token, '/auth/me').then(setUser).catch((e) => {
+      if (e.message?.includes('(401)')) { setToken(null); try { sessionStorage.removeItem('nikkel_token') } catch {} }
+    })
     api(token, '/projects').then(setProjects).catch(() => {})
   }, [token])
 
