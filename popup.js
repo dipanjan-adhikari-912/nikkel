@@ -343,8 +343,12 @@ $('signOutLink').addEventListener('click', async () => {
   init();
 });
 
-$('dashboardLink').addEventListener('click', () => {
-  chrome.tabs.create({ url: 'https://nikkel-wheat.vercel.app/dashboard' });
+$('dashboardLink').addEventListener('click', async () => {
+  const tab = await getActiveTab();
+  const state = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
+  const token = state?.token || '';
+  const sep = token ? `#token=${encodeURIComponent(token)}` : '';
+  chrome.tabs.create({ url: `https://nikkel-wheat.vercel.app/dashboard${sep}` });
 });
 
 $('settingsLink').addEventListener('click', () => {
