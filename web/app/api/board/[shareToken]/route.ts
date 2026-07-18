@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
 
       const { data: nikkels, error: nikkelError } = await db
         .from('nikkels')
-        .select('*')
+        .select('*, replies(*)')
         .eq('review_id', fullReview.id)
         .order('created_at', { ascending: true })
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
 
     const { data: nikkels, error: nikkelError } = await db
       .from('nikkels')
-      .select('*')
+      .select('*, replies(*)')
       .eq('review_id', review.id)
       .order('created_at', { ascending: true })
 
