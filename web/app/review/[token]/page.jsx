@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { supabaseClient } from '@/lib/client/supabase'
 
 function getToken() {
   const hash = window.location.hash
@@ -32,11 +33,23 @@ export default function ReviewPage({ params }) {
   const [extensionDetected, setExtensionDetected] = useState(false)
   const [opening, setOpening] = useState(false)
   const [openingError, setOpeningError] = useState(null)
+  const [needsJoin, setNeedsJoin] = useState(false)
+  const [joining, setJoining] = useState(false)
 
   useEffect(() => {
     const t = getToken()
-    if (t) setToken(t)
+    if (t) { setToken(t); return }
+    supabaseClient.auth.getSession().then(({ data }) => {
+      if (data?.session?.access_token) setToken(data.session.access_token)
+    })
   }, [])
+
+  function signInWithGoogle() {
+    supabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href },
+    })
+  }
 
   useEffect(() => {
     function handler(event) {
@@ -104,10 +117,23 @@ export default function ReviewPage({ params }) {
       })
       setReplyText(r => ({ ...r, [nikkelId]: '' }))
     } catch (e) {
-      alert(e.message)
+      if (e.message === 'not_a_collaborator') setNeedsJoin(true)
+      else alert(e.message)
     }
     setSubmitting(s => ({ ...s, [nikkelId]: false }))
   }, [token, params.token, replyText])
+
+  async function joinProject() {
+    if (!token || !data) return
+    setJoining(true)
+    try {
+      await api(token, `/api/projects/${data.project.id}/collaborators`, { method: 'POST' })
+      setNeedsJoin(false)
+    } catch (e) {
+      alert(e.message)
+    }
+    setJoining(false)
+  }
 
   if (error === 'not-found') {
     return <Shell><Icon>🔗</Icon><Title>Review not found</Title><Text>This link may be invalid or the review was removed.</Text></Shell>
@@ -178,6 +204,18 @@ export default function ReviewPage({ params }) {
         {openingError && <p style={{ color: '#f87171', fontSize: 13, margin: '8px 0 0' }}>{openingError}</p>}
       </div>
 
+      {/* Join prompt */}
+      {needsJoin && (
+        <div style={{ maxWidth: 720, margin: '16px auto 0', padding: '0 16px' }}>
+          <div style={{ background: '#312e81', border: '1px solid #4338ca', borderRadius: 8, padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span style={{ fontSize: 13, color: '#e0e7ff' }}>Join this project to reply and drop your own nikkels.</span>
+            <button onClick={joinProject} disabled={joining} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: joining ? 'default' : 'pointer', flexShrink: 0 }}>
+              {joining ? 'Joining…' : 'Join project'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Nikkels grouped by page */}
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 48px' }}>
         {Object.entries(pages).map(([pageUrl, pageNikkels]) => (
@@ -197,6 +235,7 @@ export default function ReviewPage({ params }) {
                   submitting={submitting[nikkel.id]}
                   onReplyChange={v => setReplyText(r => ({ ...r, [nikkel.id]: v }))}
                   onSubmit={() => submitReply(nikkel.id)}
+                  onSignIn={signInWithGoogle}
                 />
               ))}
             </div>
@@ -213,7 +252,7 @@ export default function ReviewPage({ params }) {
   )
 }
 
-function NikkelCard({ nikkel, token, replyText, submitting, onReplyChange, onSubmit }) {
+function NikkelCard({ nikkel, token, replyText, submitting, onReplyChange, onSubmit, onSignIn }) {
   const [showReplies, setShowReplies] = useState(false)
   const replies = nikkel.replies || []
 
@@ -259,8 +298,8 @@ function NikkelCard({ nikkel, token, replyText, submitting, onReplyChange, onSub
         </div>
       )}
 
-      {/* Reply form */}
-      {token && (
+      {/* Reply form / sign-in prompt */}
+      {token ? (
         <div style={{ borderTop: '1px solid #334155', padding: 10 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
@@ -278,6 +317,12 @@ function NikkelCard({ nikkel, token, replyText, submitting, onReplyChange, onSub
               {submitting ? 'Sending...' : 'Reply'}
             </button>
           </div>
+        </div>
+      ) : (
+        <div style={{ borderTop: '1px solid #334155', padding: 10, textAlign: 'center' }}>
+          <button onClick={onSignIn} style={{ padding: '7px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Sign in to reply
+          </button>
         </div>
       )}
     </div>
