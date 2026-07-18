@@ -975,7 +975,7 @@ function onPageReady(fn) {
   }
 }
 
-function resumeActiveReview() {
+function resumeActiveReview(retries = 5) {
   if (!isValid()) return;
   try {
     chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
@@ -983,6 +983,8 @@ function resumeActiveReview() {
       if (res?.ok && res.project) {
         if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly, res.dashboardUrl);
         onPageReady(loadPinsForReview);
+      } else if (retries > 0) {
+        setTimeout(() => resumeActiveReview(retries - 1), 600);
       }
     });
   } catch (e) { console.warn('[Nikkel] GET_STATE failed', e.message); }
