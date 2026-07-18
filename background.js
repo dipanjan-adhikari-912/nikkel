@@ -147,7 +147,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE':
-        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token: globalState.token || '' };
+        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token: globalState.token || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` };
 
       case 'START_REVIEW': {
         if (globalState.globalDisabled) return { ok: false, error: 'Nikkel is disabled' };
@@ -231,8 +231,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
           return { ok: true, nikkels: [] };
         }
-        const pageUrl = msg.payload?.pageUrl || tab.url;
-        const nikkels = await pinService.findByReview(tab.review.id, { pageUrl }, globalState.token);
+        const nikkels = await pinService.findByReview(tab.review.id, {}, globalState.token);
         tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
@@ -479,7 +478,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (reused) {
           const ts = getTabState(tab.id);
           try {
-            const nikkels = await pinService.findByReview(ts.review.id, { pageUrl: normalized }, globalState.token);
+            const nikkels = await pinService.findByReview(ts.review.id, {}, globalState.token);
             ts.nikkels = nikkels;
             await sendToTab(tab.id, {
               type: 'LOAD_SESSION',
