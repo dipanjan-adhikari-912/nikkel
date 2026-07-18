@@ -82,15 +82,15 @@ create table if not exists profiles (
 
 alter table profiles enable row level security;
 
-create policy if not exists "Anyone can view profiles"
+create policy "Anyone can view profiles"
   on profiles for select
   using (true);
 
-create policy if not exists "Users can insert own profile"
+create policy "Users can insert own profile"
   on profiles for insert
   with check (auth.uid() = id);
 
-create policy if not exists "Users can update own profile"
+create policy "Users can update own profile"
   on profiles for update
   using (auth.uid() = id);
 
