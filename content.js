@@ -426,41 +426,48 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   });
 
   if (shareBtn) {
-    shareBtn.addEventListener('click', async () => {
-      if (pins.length === 0) {
-        shareBtn.textContent = '🔗 No pins yet';
-        shareBtn.style.opacity = '0.6';
-        setTimeout(() => {
-          shareBtn.textContent = '🔗 Share';
-          shareBtn.style.opacity = '1';
-        }, 2000);
-        return;
-      }
-      if (!shareOverlay) return;
-      shareOverlay.classList.add('visible');
-      if (shareAuthSection) shareAuthSection.style.display = 'none';
-      if (shareUrlSection) shareUrlSection.style.display = 'none';
-      if (shareMeta) shareMeta.textContent = '';
+    if (readOnly) {
+      shareBtn.disabled = true;
+      shareBtn.textContent = '🔗 Read only';
+      shareBtn.style.opacity = '0.5';
+      shareBtn.style.cursor = 'default';
+    } else {
+      shareBtn.addEventListener('click', async () => {
+        if (pins.length === 0) {
+          shareBtn.textContent = '🔗 No pins yet';
+          shareBtn.style.opacity = '0.6';
+          setTimeout(() => {
+            shareBtn.textContent = '🔗 Share';
+            shareBtn.style.opacity = '1';
+          }, 2000);
+          return;
+        }
+        if (!shareOverlay) return;
+        shareOverlay.classList.add('visible');
+        if (shareAuthSection) shareAuthSection.style.display = 'none';
+        if (shareUrlSection) shareUrlSection.style.display = 'none';
+        if (shareMeta) shareMeta.textContent = '';
 
-      let shareRes;
-      try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { shareRes = null; }
+        let shareRes;
+        try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { shareRes = null; }
 
-      if (shareRes?.ok && shareRes.shareUrl) {
-        if (shareUrlSection) shareUrlSection.style.display = '';
-        if (shareUrlTxt) shareUrlTxt.value = shareRes.shareUrl;
-        if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
-        if (copyBtn) { try { navigator.clipboard.writeText(shareRes.shareUrl); } catch {} copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500); }
-        return;
-      }
+        if (shareRes?.ok && shareRes.shareUrl) {
+          if (shareUrlSection) shareUrlSection.style.display = '';
+          if (shareUrlTxt) shareUrlTxt.value = shareRes.shareUrl;
+          if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
+          if (copyBtn) { try { navigator.clipboard.writeText(shareRes.shareUrl); } catch {} copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500); }
+          return;
+        }
 
-      if (shareRes?.ok && shareRes.needsAuth) {
+        if (shareRes?.ok && shareRes.needsAuth) {
+          if (shareAuthSection) shareAuthSection.style.display = '';
+          return;
+        }
+
+        if (shareMeta) shareMeta.textContent = shareRes?.error || 'Cannot share right now.';
         if (shareAuthSection) shareAuthSection.style.display = '';
-        return;
-      }
-
-      if (shareMeta) shareMeta.textContent = shareRes?.error || 'Cannot share right now.';
-      if (shareAuthSection) shareAuthSection.style.display = '';
-    });
+      });
+    }
   }
 
   if (copyBtn) {
@@ -657,6 +664,13 @@ function loadNikkelComments(nikkel) {
   const submit = qs(shadow, 'commentSubmit');
   const errEl = qs(shadow, 'commentError');
   if (!list || !loading || !empty || !input || !submit || !errEl) return;
+
+  if (readOnly) {
+    input.disabled = true;
+    input.placeholder = 'Login to add comments';
+    submit.disabled = true;
+    submit.style.cursor = 'default';
+  }
 
   let comments = [];
 
