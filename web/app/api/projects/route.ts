@@ -21,12 +21,29 @@ export async function GET(request: NextRequest) {
 
   if (collabError) return NextResponse.json({ error: collabError.message }, { status: 500 })
 
-  const result = [
-    ...(owned || []).map(p => ({ ...p, role: 'owner' })),
+  const all = [
+    ...owned.map(p => ({ ...p, role: 'owner' })),
     ...(collabRows || []).map(r => ({ ...r.projects, role: 'collaborator' }))
   ]
 
-  return NextResponse.json(result)
+  const enriched = await Promise.all(all.map(async (p) => {
+    const { data: reviews } = await db.from('reviews').select('id').eq('project_id', p.id)
+    const reviewIds = (reviews || []).map((r: any) => r.id)
+    let nikkelCount = 0
+    let lastActivityAt = p.created_at
+    if (reviewIds.length > 0) {
+      const { data: nikkels } = await db
+        .from('nikkels')
+        .select('created_at')
+        .in('review_id', reviewIds)
+        .order('created_at', { ascending: false })
+      nikkelCount = nikkels?.length || 0
+      if (nikkels?.[0]?.created_at) lastActivityAt = nikkels[0].created_at
+    }
+    return { ...p, nikkelCount, lastActivityAt }
+  }))
+
+  return NextResponse.json(enriched)
 }
 
 export async function POST(request: NextRequest) {
