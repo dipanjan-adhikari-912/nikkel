@@ -133,24 +133,26 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  await ready;
   if (changeInfo.url) {
     const ts = getTabState(tabId);
     ts.url = changeInfo.url;
     if (!ts.project && globalState.lastProject && globalState.token) {
+      console.log('[BG] tabs.onUpdated — matching lastProject', { baseUrl: globalState.lastProject.baseUrl, url: changeInfo.url });
       const base = globalState.lastProject.baseUrl?.replace(/\/+$/, '');
       const url = changeInfo.url.replace(/\/+$/, '');
-      if (base && url.startsWith(base)) {
-        ts.project = { id: globalState.lastProject.projectId, title: globalState.lastProject.title, base_url: globalState.lastProject.baseUrl };
-        ts.review = globalState.lastProject.reviewId ? { id: globalState.lastProject.reviewId } : null;
-        setLastProject(ts.project, ts.review);
+      if (base && (url === base || url.startsWith(base + '/') || url.startsWith(base + '?'))) {
+        const reviewId = globalState.lastProject.reviewId;
+        ts.project = { id: globalState.lastProject.projectId, title: globalState.lastProject.title, base_url: globalState.lastProject.baseUrl, baseUrl: globalState.lastProject.baseUrl };
+        ts.review = reviewId ? { id: reviewId } : null;
         ts.mode = 'annotate';
         ts.nikkels = [];
         ts.readOnly = false;
-        saveState();
-        sendToTab(tabId, {
+        await saveState();
+        await sendToTab(tabId, {
           type: 'ACTIVATE',
-          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId: globalState.lastProject.reviewId, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
         });
       }
     }
