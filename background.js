@@ -204,6 +204,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return { ok: false, error: 'Project has been deleted. Starting a new review.' };
         }
         const d = msg.payload.nikkel;
+        const saved = await pinService.create({
           reviewId: tab.review.id,
           pageUrl: d.pageUrl,
           selector: d.selector,
