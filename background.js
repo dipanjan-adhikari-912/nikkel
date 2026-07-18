@@ -484,7 +484,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const review = board.review;
         if (!project) return { ok: false, error: 'Project not found for review' };
 
-        const targetUrl = project.base_url || project.url;
+        const targetUrl = msg.payload?.pageUrl || project.base_url || project.url;
         if (!targetUrl) return { ok: false, error: 'Project has no target URL' };
 
         const normalized = targetUrl.replace(/\/+$/, '');

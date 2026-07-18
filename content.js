@@ -1041,7 +1041,7 @@ window.addEventListener('message', (event) => {
     if (!isValid()) return;
     try {
       chrome.runtime.sendMessage(
-        { type: 'LOAD_REVIEW', payload: { reviewToken: event.data.reviewToken } },
+        { type: 'LOAD_REVIEW', payload: { reviewToken: event.data.reviewToken, pageUrl: event.data.pageUrl } },
         (res) => {
           if (chrome.runtime.lastError) {
             window.postMessage({ type: 'LOAD_REVIEW_RESULT', payload: { ok: false, error: 'Extension not ready' } }, '*');
