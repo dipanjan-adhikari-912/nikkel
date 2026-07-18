@@ -1,5 +1,4 @@
--- Nikkel schema -- anonymous-first flow
--- Resets all tables. Run after schema changes.
+-- Nikkel schema — full reset. Run after schema changes.
 
 drop table if exists replies cascade;
 drop table if exists nikkels cascade;
