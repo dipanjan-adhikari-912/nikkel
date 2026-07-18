@@ -70,7 +70,7 @@ export default function DashboardPage() {
   }, [token])
 
   function copyShareLink(shareToken) {
-    navigator.clipboard.writeText(`${window.location.origin}/board/${shareToken}`)
+    navigator.clipboard.writeText(`${window.location.origin}/review/${shareToken}`)
   }
 
   if (!token) {
