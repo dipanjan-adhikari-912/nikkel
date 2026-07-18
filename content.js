@@ -631,8 +631,8 @@ function injectPopover(pageX, pageY, nikkel) {
   if (nvComment) nvComment.textContent = nikkel.comment || '';
   if (nvMeta) nvMeta.textContent = nikkel.selector ? `Selector: ${nikkel.selector}` : '';
 
-  let x = pageX;
-  let y = pageY;
+  let x = pageX - window.scrollX;
+  let y = pageY - window.scrollY;
   const pw = 264;
   const ph = 120;
   if (x + pw + 10 > window.innerWidth) x = window.innerWidth - pw - 10;
