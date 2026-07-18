@@ -310,7 +310,7 @@ $('dashboardLink').addEventListener('click', async () => {
   const state = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
   const token = state?.token || '';
   const sep = token ? `#token=${encodeURIComponent(token)}` : '';
-  chrome.tabs.create({ url: `https://nikkel-wheat.vercel.app/dashboard${sep}` });
+  chrome.tabs.create({ url: `https://nikkel-alpha.vercel.app/dashboard${sep}` });
 });
 
 $('settingsLink').addEventListener('click', () => {

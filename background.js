@@ -365,18 +365,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!tab.project) return { ok: false, error: 'No project in tab' };
         if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Not authenticated' };
         try {
-          const res = await fetch(`${API_URL}/api/projects/${tab.project.id}/collaborators`, {
+          const claimUrl = `${API_URL}/api/projects/${tab.project.id}/collaborators`;
+          console.log('[BG] CLAIM_PROJECT — url:', claimUrl, 'token prefix:', globalState.token?.slice(0, 20));
+          const res = await fetch(claimUrl, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${globalState.token}`, 'Content-Type': 'application/json' },
           });
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
-            return { ok: false, error: body.error || 'Failed to claim project' };
+            console.log('[BG] CLAIM_PROJECT — failed', res.status, body);
+            return { ok: false, error: body.error || `HTTP ${res.status}` };
           }
           tab.readOnly = false;
           await saveState();
           return { ok: true };
         } catch (e) {
+          console.log('[BG] CLAIM_PROJECT — network error', e.message);
           return { ok: false, error: e.message };
         }
       }

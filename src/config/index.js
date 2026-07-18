@@ -3,8 +3,8 @@
 //   API_URL           — required; Vercel API endpoint (same domain as viewer)
 //   CHROME_STORE_URL  — optional; set when published to Chrome Web Store
 
-const VIEWER = 'https://nikkel-wheat.vercel.app';
-const API = 'https://nikkel-wheat.vercel.app';
+const VIEWER = 'https://nikkel-alpha.vercel.app';
+const API = 'https://nikkel-alpha.vercel.app';
 
 function must(name, raw) {
   const v = (raw || '').replace(/\/+$/, '');
