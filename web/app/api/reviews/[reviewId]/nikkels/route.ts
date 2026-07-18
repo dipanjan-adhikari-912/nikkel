@@ -20,6 +20,36 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
+  const { data: review } = await db
+    .from('reviews')
+    .select('project_id')
+    .eq('id', params.reviewId)
+    .single()
+
+  if (!review) return NextResponse.json({ error: 'Review not found' }, { status: 404 })
+
+  const { data: project } = await db
+    .from('projects')
+    .select('owner_id')
+    .eq('id', review.project_id)
+    .single()
+
+  const isOwner = project?.owner_id === auth.user.id
+  let isCollaborator = false
+  if (!isOwner) {
+    const { data: collab } = await db
+      .from('project_collaborators')
+      .select('user_id')
+      .eq('project_id', review.project_id)
+      .eq('user_id', auth.user.id)
+      .maybeSingle()
+    isCollaborator = !!collab
+  }
+
+  if (!isOwner && !isCollaborator) {
+    return NextResponse.json({ error: 'not_a_collaborator', projectId: review.project_id }, { status: 403 })
+  }
+
   const { pageUrl, selector, coordX, coordY, elementTag, elementText, commentText } = await request.json()
   if (!pageUrl || !commentText) {
     return NextResponse.json({ error: 'pageUrl and commentText are required' }, { status: 400 })

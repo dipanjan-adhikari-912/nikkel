@@ -4,6 +4,7 @@
 drop table if exists replies cascade;
 drop table if exists nikkels cascade;
 drop table if exists reviews cascade;
+drop table if exists project_collaborators cascade;
 drop table if exists projects cascade;
 
 -- Projects (auto-created on Start Review)
@@ -67,11 +68,6 @@ create policy "Owners can update own reviews"
 create index if not exists reviews_share_token_idx on reviews (share_token);
 create index if not exists reviews_project_id_idx on reviews (project_id);
 
--- Add sender info for public review pages
-alter table reviews add column if not exists shared_by_name text;
-alter table reviews add column if not exists shared_by_email text;
-alter table reviews add column if not exists shared_by_avatar text;
-
 -- Profiles (sender identity for public review pages, populated on Google sign-in)
 create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade,
@@ -111,6 +107,7 @@ create table nikkels (
   element_text text,
   comment text not null,
   idx integer not null,
+  screenshot_url text,
   created_at timestamptz not null default now()
 );
 
@@ -120,15 +117,50 @@ create policy "Anyone can view nikkels"
   on nikkels for select
   using (true);
 
-create policy "Anyone can submit nikkels"
+create policy "owner_or_collaborator_can_add_nikkels"
   on nikkels for insert
-  with check (true);
+  with check (
+    exists (
+      select 1 from reviews r
+      join projects p on p.id = r.project_id
+      where r.id = review_id
+        and (
+          p.owner_id = auth.uid()
+          or exists (select 1 from project_collaborators c where c.project_id = p.id and c.user_id = auth.uid())
+        )
+    )
+  );
 
 create policy "Owners can update nikkels"
   on nikkels for update
   using (auth.uid() = owner_id);
 
 create index if not exists nikkels_review_id_idx on nikkels (review_id);
+
+-- Project collaborators (who can access a project)
+create table project_collaborators (
+  project_id uuid not null references projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null default 'collaborator' check (role in ('owner', 'collaborator')),
+  added_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+
+alter table project_collaborators enable row level security;
+
+create policy "members_can_view_collaborator_list"
+  on project_collaborators for select
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from projects p where p.id = project_id and p.owner_id = auth.uid())
+  );
+
+create policy "authenticated_users_can_claim_seat"
+  on project_collaborators for insert
+  with check (
+    auth.uid() = user_id
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
 
 -- Replies (comments on nikkels)
 create table replies (
@@ -149,9 +181,20 @@ create policy "Anyone can view replies"
   on replies for select
   using (true);
 
-create policy "Anyone can create replies"
+create policy "owner_or_collaborator_can_reply"
   on replies for insert
-  with check (true);
+  with check (
+    exists (
+      select 1 from nikkels n
+      join reviews r on r.id = n.review_id
+      join projects p on p.id = r.project_id
+      where n.id = nikkel_id
+        and (
+          p.owner_id = auth.uid()
+          or exists (select 1 from project_collaborators c where c.project_id = p.id and c.user_id = auth.uid())
+        )
+    )
+  );
 
 create policy "Authors can update own replies"
   on replies for update
