@@ -493,36 +493,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const tabs = await chrome.tabs.query({});
         const existing = tabs.find(t => t.url && t.url.replace(/\/+$/, '') === normalized && !t.url.startsWith('chrome-extension://'));
 
+        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: true };
+
         let tab;
         let reused = false;
         if (existing) {
           tab = existing;
           reused = true;
+          Object.assign(getTabState(tab.id), stateForTab);
           await chrome.tabs.update(tab.id, { active: true });
           await chrome.windows.update(tab.windowId, { focused: true });
         } else {
           tab = await chrome.tabs.create({ url: targetUrl, active: true });
+          Object.assign(getTabState(tab.id), stateForTab);
         }
 
-        getTabState(tab.id).project = project;
-        getTabState(tab.id).review = { id: review.id, share_token: rt };
-        getTabState(tab.id).mode = 'browse';
-        getTabState(tab.id).nikkels = [];
-        getTabState(tab.id).url = targetUrl;
-        getTabState(tab.id).readOnly = true;
         setLastProject(project, review);
         await saveState();
-        if (reused) {
-          const ts = getTabState(tab.id);
-          try {
-            const nikkels = await pinService.findByReview(ts.review.id, {}, globalState.token);
-            ts.nikkels = nikkels;
-            await sendToTab(tab.id, {
-              type: 'LOAD_SESSION',
-              payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
-            });
-          } catch {}
-        }
+        try {
+          const nikkels = await pinService.findByReview(review.id, {}, globalState.token);
+          stateForTab.nikkels = nikkels;
+          await sendToTab(tab.id, {
+            type: 'LOAD_SESSION',
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+          });
+        } catch {}
         return { ok: true, targetUrl, reused };
       }
 
