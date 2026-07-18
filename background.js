@@ -261,9 +261,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
           return { ok: true, nikkels: [] };
         }
-        const pageUrl = msg.payload?.pageUrl || tab.url;
-        const nikkels = await pinService.findByReview(tab.review.id, { pageUrl }, globalState.token);
-        tab.nikkels = nikkels;
+        const allPages = msg.payload?.allPages;
+        const pageUrl = allPages ? undefined : (msg.payload?.pageUrl || tab.url);
+        const opts = pageUrl ? { pageUrl } : {};
+        const nikkels = await pinService.findByReview(tab.review.id, opts, globalState.token);
+        if (!allPages) tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
 

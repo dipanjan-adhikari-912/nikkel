@@ -38,9 +38,25 @@ const BAR_HTML = `
     #inspLive span { white-space: nowrap; }
     .il { color: #64748b; }
     .iv { color: #e2e8f0; }
-    #pinsBtn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
-    #pinsBtn:hover { background: #334155; }
+    #eyeBtn, #pinsBtn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+    #eyeBtn:hover, #pinsBtn:hover { background: #334155; }
+    #eyeBtn.hidden { color: #475569; }
     #pinsBadge { background: #6366f1; color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
+    #pinDrawer { display: none; position: absolute; bottom: 42px; left: 0; right: 0; max-height: min(280px, calc(100vh - 42px)); overflow-y: auto; background: #0f172a; border-bottom: 1px solid #1e293b; padding: 4px 0; box-shadow: 0 -4px 12px rgba(0,0,0,.3); }
+    #pinDrawer.visible { display: block; }
+    #pinDrawerHeader { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px 8px; border-bottom: 1px solid #1e293b; margin-bottom: 4px; }
+    #pinDrawerHeader span { color: #e2e8f0; font-weight: 600; font-size: 13px; }
+    #pinDrawerClose { background: none; border: none; color: #64748b; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+    #pinDrawerClose:hover { color: #e2e8f0; }
+    .pdItem { display: flex; gap: 8px; padding: 5px 12px; align-items: flex-start; cursor: default; }
+    .pdItem:hover { background: #1e293b; }
+    .pdIdx { width: 22px; height: 22px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+    .pdBody { flex: 1; min-width: 0; }
+    .pdPage { font-size: 11px; color: #818cf8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .pdMeta { font-size: 12px; color: #94a3b8; margin-top: 1px; }
+    .pdMeta strong { color: #64748b; font-weight: 500; }
+    .pdComment { font-size: 12px; color: #e2e8f0; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #pinDrawerEmpty { padding: 16px; text-align: center; color: #64748b; font-size: 13px; }
     #shareBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 500; font-size: 12px; margin-left: auto; }
     #shareBtn:hover { background: #4f46e5; }
     #dashboardLink { color: #94a3b8; text-decoration: none; font-size: 12px; margin-left: auto; margin-right: 6px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
@@ -79,9 +95,17 @@ const BAR_HTML = `
       <span><span class="il">XY:</span> <span class="iv" id="iXY">—</span></span>
     </div>
     <div class="bar-sep"></div>
-    <button id="pinsBtn">📍<span id="pinsBadge">0</span></button>
+    <button id="eyeBtn">👁</button>
+    <button id="pinsBtn">📋<span id="pinsBadge">0</span></button>
     <a id="dashboardLink" href="#" target="_blank">Dashboard</a>
     <button id="shareBtn">🔗 Share</button>
+  </div>
+  <div id="pinDrawer">
+    <div id="pinDrawerHeader">
+      <span>All Pins</span>
+      <button id="pinDrawerClose">✕</button>
+    </div>
+    <div id="pinDrawerList"></div>
   </div>
   <div id="shareOverlay">
     <div id="shareModal">
@@ -293,6 +317,9 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   const inspLive = qs(shadow, 'inspLive');
   const pinsBtn = qs(shadow, 'pinsBtn');
   const pinsBadge = qs(shadow, 'pinsBadge');
+  const eyeBtn = qs(shadow, 'eyeBtn');
+  const pinDrawer = qs(shadow, 'pinDrawer');
+  const pinDrawerClose = qs(shadow, 'pinDrawerClose');
   const dashboardLink = qs(shadow, 'dashboardLink');
   const shareBtn = qs(shadow, 'shareBtn');
   const shareOverlay = qs(shadow, 'shareOverlay');
@@ -337,14 +364,66 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   if (browseBtn) browseBtn.addEventListener('click', () => switchMode('browse'));
   if (annotateBtn) annotateBtn.addEventListener('click', () => switchMode('annotate'));
 
-  if (pinsBtn) {
-    pinsBtn.addEventListener('click', () => {
+  if (eyeBtn) {
+    eyeBtn.addEventListener('click', () => {
       isPinsVisible = !isPinsVisible;
       if (pinsContainer) {
         pinsContainer.style.display = isPinsVisible ? '' : 'none';
       }
+      eyeBtn.classList.toggle('hidden', !isPinsVisible);
+      eyeBtn.textContent = isPinsVisible ? '👁' : '🙈';
     });
   }
+
+  function openPinDrawer() {
+    if (!pinDrawer) return;
+    chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { allPages: true } }, (res) => {
+      if (chrome.runtime.lastError) return;
+      const list = qs(pinDrawer, 'pinDrawerList');
+      if (!list) return;
+      if (res?.ok && res.nikkels?.length) {
+        list.innerHTML = res.nikkels.map(n => {
+          let pageLabel = '';
+          try { const u = new URL(n.pageUrl); pageLabel = u.hostname + u.pathname; } catch { pageLabel = n.pageUrl || ''; }
+          const text = n.elementText ? `"${n.elementText.slice(0, 60)}"` : '';
+          const comment = n.comment ? n.comment.slice(0, 80) : '';
+          return `<div class="pdItem">
+            <span class="pdIdx">${n.idx || '?'}</span>
+            <div class="pdBody">
+              <span class="pdPage">${pageLabel}</span>
+              <div class="pdMeta">${n.tag ? `<strong>&lt;${n.tag}&gt;</strong> ` : ''}${text}</div>
+              ${comment ? `<div class="pdComment">${comment}</div>` : ''}
+            </div>
+          </div>`;
+        }).join('');
+      } else {
+        list.innerHTML = '<div id="pinDrawerEmpty">No pins yet</div>';
+      }
+      pinDrawer.classList.add('visible');
+    });
+  }
+
+  if (pinsBtn) {
+    pinsBtn.addEventListener('click', () => {
+      if (pinDrawer?.classList.contains('visible')) {
+        pinDrawer.classList.remove('visible');
+      } else {
+        openPinDrawer();
+      }
+    });
+  }
+
+  if (pinDrawerClose) {
+    pinDrawerClose.addEventListener('click', () => {
+      if (pinDrawer) pinDrawer.classList.remove('visible');
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pinDrawer?.classList.contains('visible')) {
+      pinDrawer.classList.remove('visible');
+    }
+  });
 
   if (shareBtn) {
     shareBtn.addEventListener('click', async () => {
