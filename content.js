@@ -343,6 +343,15 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
 
   if (shareBtn) {
     shareBtn.addEventListener('click', () => {
+      if (pins.length === 0) {
+        shareBtn.textContent = '🔗 No pins yet';
+        shareBtn.style.opacity = '0.6';
+        setTimeout(() => {
+          shareBtn.textContent = '🔗 Share';
+          shareBtn.style.opacity = '1';
+        }, 2000);
+        return;
+      }
       if (shareOverlay) shareOverlay.classList.add('visible');
     });
   }

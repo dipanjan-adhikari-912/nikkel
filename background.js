@@ -570,7 +570,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         console.log('[BG] SHARE — isAnonymous:', globalState.isAnonymous, 'user.id:', globalState.user?.id, 'user.email:', globalState.user?.email, 'JWT sub:', jwtSub(globalState.token));
         console.log('[BG] SHARE — tab state', { projectId: tab.project.id, projectOwnerId: tab.project.ownerId || tab.project.owner_id, reviewOwnerId: tab.review?.owner_id, reviewId: tab.review?.id });
 
-        if (globalState.isAnonymous) {
+        if (globalState.isAnonymous || !globalState.user?.email) {
+          if (!globalState.isAnonymous) {
+            console.warn('[BG] SHARE — isAnonymous=false but no email, treating as anonymous');
+          }
           pendingShare = { tabId: srcTabId };
           await saveState();
           console.log('[BG] SHARE — deferred, pendingShare set');
