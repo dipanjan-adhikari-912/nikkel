@@ -95,6 +95,31 @@ create policy "Users can update own profile"
   on profiles for update
   using (auth.uid() = id);
 
+-- Project collaborators (who can access a project)
+create table project_collaborators (
+  project_id uuid not null references projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null default 'collaborator' check (role in ('owner', 'collaborator')),
+  added_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+
+alter table project_collaborators enable row level security;
+
+create policy "members_can_view_collaborator_list"
+  on project_collaborators for select
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from projects p where p.id = project_id and p.owner_id = auth.uid())
+  );
+
+create policy "authenticated_users_can_claim_seat"
+  on project_collaborators for insert
+  with check (
+    auth.uid() = user_id
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
+
 -- Nikkels (pins belong to a review, which belongs to a project)
 create table nikkels (
   id uuid primary key default gen_random_uuid(),
@@ -141,30 +166,6 @@ create policy "Owners can update nikkels"
 create index if not exists nikkels_review_id_idx on nikkels (review_id);
 
 -- Project collaborators (who can access a project)
-create table project_collaborators (
-  project_id uuid not null references projects(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  role text not null default 'collaborator' check (role in ('owner', 'collaborator')),
-  added_at timestamptz not null default now(),
-  primary key (project_id, user_id)
-);
-
-alter table project_collaborators enable row level security;
-
-create policy "members_can_view_collaborator_list"
-  on project_collaborators for select
-  using (
-    auth.uid() = user_id
-    or exists (select 1 from projects p where p.id = project_id and p.owner_id = auth.uid())
-  );
-
-create policy "authenticated_users_can_claim_seat"
-  on project_collaborators for insert
-  with check (
-    auth.uid() = user_id
-    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
-  );
-
 -- Replies (comments on nikkels)
 create table replies (
   id uuid primary key default gen_random_uuid(),
