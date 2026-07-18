@@ -3,6 +3,7 @@
 drop table if exists replies cascade;
 drop table if exists nikkels cascade;
 drop table if exists reviews cascade;
+drop table if exists profiles cascade;
 drop table if exists project_collaborators cascade;
 drop table if exists projects cascade;
 
@@ -71,7 +72,7 @@ create index if not exists reviews_share_token_idx on reviews (share_token);
 create index if not exists reviews_project_id_idx on reviews (project_id);
 
 -- Profiles (sender identity for public review pages, populated on Google sign-in)
-create table if not exists profiles (
+create table profiles (
   id uuid primary key references auth.users on delete cascade,
   name text,
   email text,
