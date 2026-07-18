@@ -29,11 +29,45 @@ export default function ReviewPage({ params }) {
   const [token, setToken] = useState(null)
   const [replyText, setReplyText] = useState({})
   const [submitting, setSubmitting] = useState({})
+  const [extensionDetected, setExtensionDetected] = useState(false)
+  const [opening, setOpening] = useState(false)
+  const [openingError, setOpeningError] = useState(null)
 
   useEffect(() => {
     const t = getToken()
     if (t) setToken(t)
   }, [])
+
+  useEffect(() => {
+    function handler(event) {
+      if (event.data?.source === 'nikkel-extension') setExtensionDetected(true)
+    }
+    window.addEventListener('message', handler)
+    if (document.documentElement.dataset.nikkelExtension) { setExtensionDetected(true); return () => window.removeEventListener('message', handler) }
+    window.postMessage({ type: 'PING' }, '*')
+    const interval = setInterval(() => {
+      if (document.documentElement.dataset.nikkelExtension) { setExtensionDetected(true); clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler); return }
+      window.postMessage({ type: 'PING' }, '*')
+    }, 300)
+    const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
+    return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
+  }, [])
+
+  useEffect(() => {
+    function resultHandler(event) {
+      if (event.data?.type === 'LOAD_REVIEW_RESULT') {
+        setOpening(false)
+        if (!event.data?.payload?.ok) setOpeningError(event.data?.payload?.error || 'Failed to open review')
+      }
+    }
+    window.addEventListener('message', resultHandler)
+    return () => window.removeEventListener('message', resultHandler)
+  }, [])
+
+  const handleOpenReview = useCallback(() => {
+    setOpening(true); setOpeningError(null)
+    window.postMessage({ action: 'LOAD_REVIEW', reviewToken: params.token }, '*')
+  }, [params.token])
 
   useEffect(() => {
     fetch(`/api/board/${params.token}`)
@@ -120,10 +154,19 @@ export default function ReviewPage({ params }) {
       <div style={{ borderBottom: '1px solid #1e293b', padding: '24px 32px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
           <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} alt="" onError={e => e.target.style.display = 'none'} style={{ width: 32, height: 32, borderRadius: 6 }} />
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{project.title || project.name || 'Untitled'}</h1>
             {pageUrl && <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 13, textDecoration: 'none' }}>{domain}</a>}
           </div>
+          {extensionDetected && (
+            <button
+              onClick={handleOpenReview}
+              disabled={opening}
+              style={{ padding: '8px 16px', background: opening ? '#4f46e5' : '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: opening ? 'default' : 'pointer', fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+            >
+              {opening ? 'Opening...' : 'Open in Nikkel'}
+            </button>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b' }}>
           <span>{pinCount} {pinCount === 1 ? 'annotation' : 'annotations'}</span>
@@ -132,17 +175,19 @@ export default function ReviewPage({ params }) {
           <span>·</span>
           <span>{created}</span>
         </div>
+        {openingError && <p style={{ color: '#f87171', fontSize: 13, margin: '8px 0 0' }}>{openingError}</p>}
       </div>
 
       {/* Nikkels grouped by page */}
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 48px' }}>
         {Object.entries(pages).map(([pageUrl, pageNikkels]) => (
           <div key={pageUrl} style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '0 4px' }}>
-              <span style={{ color: '#475569', fontSize: 14 }}>📄</span>
-              <span style={{ fontSize: 13, color: '#94a3b8', fontFamily: 'monospace', wordBreak: 'break-all' }}>{pageUrl}</span>
+            <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '6px 8px', borderRadius: 6, textDecoration: 'none', color: '#94a3b8', background: '#1e293b' }}>
+              <span style={{ fontSize: 14 }}>📄</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageUrl}</span>
               <span style={{ padding: '1px 7px', borderRadius: 8, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>{pageNikkels.length}</span>
-            </div>
+              <span style={{ fontSize: 12, color: '#6366f1', flexShrink: 0 }}>Visit →</span>
+            </a>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {pageNikkels.map(nikkel => (
                 <NikkelCard
