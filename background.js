@@ -358,6 +358,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, user: globalState.user };
       }
 
+      case 'CLAIM_PROJECT': {
+        const srcTabId = sender.tab?.id || tabId;
+        if (!srcTabId) return { ok: false, error: 'No tab context' };
+        const tab = getTabState(srcTabId);
+        if (!tab.project) return { ok: false, error: 'No project in tab' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Not authenticated' };
+        try {
+          const res = await fetch(`${API_URL}/api/projects/${tab.project.id}/collaborators`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${globalState.token}`, 'Content-Type': 'application/json' },
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            return { ok: false, error: body.error || 'Failed to claim project' };
+          }
+          tab.readOnly = false;
+          await saveState();
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
       case 'ACTIVATE_TAB': {
         const tId = msg.payload?.tabId;
         if (tId) {

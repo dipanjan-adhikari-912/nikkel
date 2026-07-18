@@ -426,47 +426,66 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   });
 
   if (shareBtn) {
-    if (readOnly) {
-      shareBtn.disabled = true;
-      shareBtn.textContent = '🔗 Read only';
-      shareBtn.style.opacity = '0.5';
-      shareBtn.style.cursor = 'default';
-    } else {
-      shareBtn.addEventListener('click', async () => {
-        if (pins.length === 0) {
-          shareBtn.textContent = '🔗 No pins yet';
-          shareBtn.style.opacity = '0.6';
-          setTimeout(() => {
+    shareBtn.addEventListener('click', async () => {
+      if (readOnly) {
+        shareBtn.disabled = true;
+        shareBtn.textContent = 'Signing in…';
+        const authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' }).catch(() => null);
+        if (authRes?.ok) {
+          const claimRes = await chrome.runtime.sendMessage({ type: 'CLAIM_PROJECT' }).catch(() => null);
+          if (claimRes?.ok) {
+            readOnly = false;
             shareBtn.textContent = '🔗 Share';
-            shareBtn.style.opacity = '1';
-          }, 2000);
-          return;
+            shareBtn.disabled = false;
+            shareBtn.style.opacity = '';
+            shareBtn.style.cursor = '';
+            return;
+          }
+          shareBtn.textContent = claimRes?.error || 'Failed to claim project';
+        } else {
+          shareBtn.textContent = authRes?.error || 'Sign in failed';
         }
-        if (!shareOverlay) return;
-        shareOverlay.classList.add('visible');
-        if (shareAuthSection) shareAuthSection.style.display = 'none';
-        if (shareUrlSection) shareUrlSection.style.display = 'none';
-        if (shareMeta) shareMeta.textContent = '';
+        shareBtn.disabled = false;
+        setTimeout(() => { shareBtn.textContent = '🔗 Login'; }, 3000);
+        return;
+      }
 
-        let shareRes;
-        try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { shareRes = null; }
+      if (pins.length === 0) {
+        shareBtn.textContent = '🔗 No pins yet';
+        shareBtn.style.opacity = '0.6';
+        setTimeout(() => {
+          shareBtn.textContent = '🔗 Share';
+          shareBtn.style.opacity = '1';
+        }, 2000);
+        return;
+      }
+      if (!shareOverlay) return;
+      shareOverlay.classList.add('visible');
+      if (shareAuthSection) shareAuthSection.style.display = 'none';
+      if (shareUrlSection) shareUrlSection.style.display = 'none';
+      if (shareMeta) shareMeta.textContent = '';
 
-        if (shareRes?.ok && shareRes.shareUrl) {
-          if (shareUrlSection) shareUrlSection.style.display = '';
-          if (shareUrlTxt) shareUrlTxt.value = shareRes.shareUrl;
-          if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
-          if (copyBtn) { try { navigator.clipboard.writeText(shareRes.shareUrl); } catch {} copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500); }
-          return;
-        }
+      let shareRes;
+      try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { shareRes = null; }
 
-        if (shareRes?.ok && shareRes.needsAuth) {
-          if (shareAuthSection) shareAuthSection.style.display = '';
-          return;
-        }
+      if (shareRes?.ok && shareRes.shareUrl) {
+        if (shareUrlSection) shareUrlSection.style.display = '';
+        if (shareUrlTxt) shareUrlTxt.value = shareRes.shareUrl;
+        if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
+        if (copyBtn) { try { navigator.clipboard.writeText(shareRes.shareUrl); } catch {} copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500); }
+        return;
+      }
 
-        if (shareMeta) shareMeta.textContent = shareRes?.error || 'Cannot share right now.';
+      if (shareRes?.ok && shareRes.needsAuth) {
         if (shareAuthSection) shareAuthSection.style.display = '';
-      });
+        return;
+      }
+
+      if (shareMeta) shareMeta.textContent = shareRes?.error || 'Cannot share right now.';
+      if (shareAuthSection) shareAuthSection.style.display = '';
+    });
+    if (readOnly) {
+      shareBtn.textContent = '🔗 Login';
     }
   }
 
