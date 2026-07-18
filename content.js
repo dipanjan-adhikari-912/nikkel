@@ -669,6 +669,14 @@ function removePopover() {
   }
 }
 
+function pinColor(userId) {
+  if (!userId || userId === 'local') return '#06b6d4';
+  const colors = ['#6366f1','#ec4899','#f59e0b','#10b981','#8b5cf6','#ef4444','#14b8a6','#f97316','#3b82f6','#84cc16','#a855f7','#e11d48'];
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) { hash = ((hash << 5) - hash) + userId.charCodeAt(i); hash |= 0; }
+  return colors[Math.abs(hash) % colors.length];
+}
+
 function addPin(nikkel) {
   if (!pinsContainer) return;
   pinCounter++;
@@ -676,10 +684,10 @@ function addPin(nikkel) {
   const pin = document.createElement('div');
   pin.dataset.idx = idx;
   pin.dataset.sessionId = nikkel.sessionId || '';
-  const isRemote = nikkel.userId && nikkel.userId !== 'local';
   pin.textContent = idx;
   const px = (nikkel.pageX || 0) - 13;
   const py = (nikkel.pageY || 0) - 13;
+  const pc = pinColor(nikkel.userId);
   pin.style.cssText = `
     position: absolute;
     left: ${px}px;
@@ -687,7 +695,7 @@ function addPin(nikkel) {
     width: 26px;
     height: 26px;
     border-radius: 50%;
-    background: ${isRemote ? '#0ea5e9' : '#6366f1'};
+    background: ${pc};
     color: #fff;
     font-size: 11px;
     font-weight: 600;
@@ -812,6 +820,14 @@ async function handleDocumentClick(e) {
 }
 
 function handleKeydown(e) {
+  if ((e.key === '`' || e.key === 'Backquote') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (currentMode !== 'annotate' && currentMode !== 'browse') return;
+    const newMode = currentMode === 'annotate' ? 'browse' : 'annotate';
+    setMode(newMode);
+    try { chrome.runtime.sendMessage({ type: 'MODE_CHANGED', payload: { mode: newMode } }); } catch {}
+    return;
+  }
   if (e.key === 'Escape') {
     if (commentHost) {
       removeCommentBubble();
