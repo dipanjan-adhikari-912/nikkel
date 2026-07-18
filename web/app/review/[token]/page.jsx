@@ -182,15 +182,11 @@ export default function ReviewPage({ params }) {
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 48px' }}>
         {Object.entries(pages).map(([pageUrl, pageNikkels]) => (
           <div key={pageUrl} style={{ marginBottom: 32 }}>
-            <button
-              onClick={() => { window.postMessage({ action: 'LOAD_REVIEW', reviewToken: params.token, pageUrl }, '*') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '6px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', color: '#94a3b8', background: '#1e293b', width: '100%', textAlign: 'left', fontSize: 'inherit', fontFamily: 'inherit' }}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '6px 8px', borderRadius: 6, color: '#94a3b8', background: '#1e293b' }}>
               <span style={{ fontSize: 14 }}>📄</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageUrl}</span>
               <span style={{ padding: '1px 7px', borderRadius: 8, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>{pageNikkels.length}</span>
-              <span style={{ fontSize: 12, color: '#6366f1', flexShrink: 0 }}>Visit →</span>
-            </button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {pageNikkels.map(nikkel => (
                 <NikkelCard
