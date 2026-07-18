@@ -31,16 +31,25 @@ export async function GET(request: NextRequest) {
     const reviewIds = (reviews || []).map((r: any) => r.id)
     let nikkelCount = 0
     let lastActivityAt = p.created_at
+    const pageBreakdown: { pageUrl: string; nikkelCount: number }[] = []
     if (reviewIds.length > 0) {
       const { data: nikkels } = await db
         .from('nikkels')
-        .select('created_at')
+        .select('created_at, page_url')
         .in('review_id', reviewIds)
         .order('created_at', { ascending: false })
       nikkelCount = nikkels?.length || 0
       if (nikkels?.[0]?.created_at) lastActivityAt = nikkels[0].created_at
+      const pageMap: Record<string, number> = {}
+      for (const n of nikkels || []) {
+        const key = n.page_url || 'unknown'
+        pageMap[key] = (pageMap[key] || 0) + 1
+      }
+      for (const [pageUrl, count] of Object.entries(pageMap)) {
+        pageBreakdown.push({ pageUrl, nikkelCount: count })
+      }
     }
-    return { ...p, nikkelCount, lastActivityAt }
+    return { ...p, nikkelCount, lastActivityAt, pageBreakdown }
   }))
 
   return NextResponse.json(enriched)

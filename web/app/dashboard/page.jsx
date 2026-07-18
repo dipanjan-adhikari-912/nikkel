@@ -211,50 +211,79 @@ function Sidebar({ user, nav, onNav, onLogout }) {
   )
 }
 
+function relativePath(pageUrl, baseUrl) {
+  if (!pageUrl || pageUrl === 'unknown') return '/'
+  try {
+    const full = new URL(pageUrl)
+    const base = baseUrl ? new URL(baseUrl) : null
+    if (base && full.origin + full.pathname === base.origin + base.pathname) return '/'
+    if (base && full.origin === base.origin) return full.pathname + full.search || '/'
+    return pageUrl
+  } catch { return pageUrl }
+}
+
 function ProjectCard({ project, onCopyShare, onDelete }) {
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
   const isOwner = project.role !== 'collaborator'
+  const pages = project.pageBreakdown || []
+  const pageCount = pages.length
 
   return (
     <div style={{ background: '#1e293b', borderRadius: 8, border: '1px solid #334155', overflow: 'hidden' }}>
-      {/* Thumbnail */}
-      <div style={{ height: 140, background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+      {/* Header with favicon */}
+      <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <img
-          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=128`}
+          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
           alt=""
           onError={(e) => { e.target.style.display = 'none' }}
-          style={{ width: 64, height: 64, imageRendering: 'auto' }}
+          style={{ width: 28, height: 28, borderRadius: 4, flexShrink: 0 }}
         />
-        {!domain && (
-          <span style={{ fontSize: 36, color: '#334155' }}>📄</span>
-        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{domain || 'No URL'}</span>
+            {!isOwner && (
+              <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: '#fef3c7', color: '#92400e', textTransform: 'uppercase', flexShrink: 0 }}>Collab</span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
+            {pageCount} {pageCount === 1 ? 'page' : 'pages'} · {project.nikkelCount ?? 0} nikkels
+          </div>
+        </div>
       </div>
 
-      {/* Body */}
-      <div style={{ padding: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{domain || 'No URL'}</span>
-          {!isOwner && (
-            <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: '#fef3c7', color: '#92400e', textTransform: 'uppercase', flexShrink: 0 }}>Collaborator</span>
-          )}
+      {/* Page list */}
+      {pages.length > 0 && (
+        <div style={{ margin: '4px 10px 0', borderTop: '1px solid #334155', paddingTop: 6 }}>
+          {pages.map((page, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 4,
+                fontSize: 13, color: '#cbd5e1', cursor: 'default',
+              }}
+            >
+              <span style={{ color: '#475569', flexShrink: 0, fontSize: 11 }}>📄</span>
+              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: 12 }}>
+                {relativePath(page.pageUrl, project.base_url)}
+              </span>
+              <span style={{ padding: '1px 7px', borderRadius: 8, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
+                {page.nikkelCount}
+              </span>
+            </div>
+          ))}
         </div>
+      )}
 
-        {/* Footer stats */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: '#64748b' }}>
-            {project.lastActivityAt ? new Date(project.lastActivityAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-          </span>
-          <span style={{ padding: '2px 8px', borderRadius: 10, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500 }}>
-            Nikkels {project.nikkelCount ?? 0}
-          </span>
-        </div>
-
-        {/* Owner actions */}
+      {/* Footer */}
+      <div style={{ padding: '8px 14px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: '#475569' }}>
+          {project.lastActivityAt ? new Date(project.lastActivityAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+        </span>
         {isOwner && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-            <button onClick={onCopyShare} style={{ flex: 1, padding: '5px 0', border: '1px solid #334155', borderRadius: 4, background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 11 }}>Copy share link</button>
-            <button onClick={onDelete} style={{ padding: '5px 10px', border: '1px solid #7f1d1d', borderRadius: 4, background: 'transparent', color: '#fca5a5', cursor: 'pointer', fontSize: 11 }}>Delete</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={onCopyShare} style={{ padding: '4px 10px', border: '1px solid #334155', borderRadius: 4, background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 11 }}>Copy link</button>
+            <button onClick={onDelete} style={{ padding: '4px 10px', border: '1px solid #7f1d1d', borderRadius: 4, background: 'transparent', color: '#fca5a5', cursor: 'pointer', fontSize: 11 }}>Delete</button>
           </div>
         )}
       </div>
