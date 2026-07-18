@@ -194,8 +194,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
         if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
+        try {
+          const pCheck = await supabaseClient.request(`/rest/v1/projects?id=eq.${tab.project.id}&select=id`, { token: globalState.token });
+          if (!pCheck || (Array.isArray(pCheck) && pCheck.length === 0)) throw new Error('gone');
+        } catch {
+          tab.project = null; tab.review = null; tab.nikkels = []; tab.mode = 'idle';
+          await saveState();
+          try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
+          return { ok: false, error: 'Project has been deleted. Starting a new review.' };
+        }
         const d = msg.payload.nikkel;
-        const saved = await pinService.create({
           reviewId: tab.review.id,
           pageUrl: d.pageUrl,
           selector: d.selector,
@@ -218,7 +226,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const srcTabId = sender.tab?.id || tabId;
         if (!srcTabId) return { ok: true, nikkels: [] };
         const tab = getTabState(srcTabId);
-        if (!tab.project || !tab.review) return { ok: true, nikkels: [] };
+        if (!tab.project || !tab.review) {
+          try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
+          return { ok: true, nikkels: [] };
+        }
         const pageUrl = msg.payload?.pageUrl || tab.url;
         const nikkels = await pinService.findByReview(tab.review.id, { pageUrl }, globalState.token);
         tab.nikkels = nikkels;
@@ -485,6 +496,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!tab.project) return { ok: false, error: 'No active project' };
         if (!tab.nikkels || tab.nikkels.length === 0) return { ok: false, error: 'Add at least one pin before sharing' };
         if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to share' };
+        try {
+          const pCheck = await supabaseClient.request(`/rest/v1/projects?id=eq.${tab.project.id}&select=id`, { token: globalState.token });
+          if (!pCheck || (Array.isArray(pCheck) && pCheck.length === 0)) {
+            tab.project = null; tab.review = null; tab.nikkels = []; tab.mode = 'idle';
+            await saveState();
+            return { ok: false, error: 'Project has been deleted.' };
+          }
+        } catch {} // network blip, let the real operation fail naturally
 
         let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
         if (!review) {

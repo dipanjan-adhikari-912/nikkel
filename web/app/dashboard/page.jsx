@@ -61,7 +61,8 @@ export default function DashboardPage() {
   const deleteProject = useCallback(async (id) => {
     try {
       await api(token, `/projects/${id}`, { method: 'DELETE' })
-      setProjects(prev => prev.filter(p => p.id !== id))
+      const updated = await api(token, '/projects')
+      setProjects(updated)
     } catch {}
   }, [token])
 
