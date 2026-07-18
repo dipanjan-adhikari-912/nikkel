@@ -23,9 +23,12 @@ create policy "Users can view own projects"
   on projects for select
   using (auth.uid() = owner_id);
 
-create policy "Anyone can create projects"
+create policy "authenticated_users_can_create_projects"
   on projects for insert
-  with check (true);
+  with check (
+    auth.uid() is not null
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
 
 create policy "Owners can update projects"
   on projects for update
