@@ -15,7 +15,9 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
       .eq('share_token', params.shareToken)
       .single()
 
-    if (reviewError || !review) {
+    const targetReview = (reviewError || !review) ? null : review
+
+    if (!targetReview) {
       const { data: project } = await db
         .from('projects')
         .select('*')
@@ -26,43 +28,59 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
 
       const { data: fallbackReview } = await db
         .from('reviews')
-        .select('*')
+        .select('*, projects(*)')
         .eq('project_id', project.id)
         .limit(1)
         .single()
 
       if (!fallbackReview) return NextResponse.json({ error: 'No review found for this project' }, { status: 404 })
 
-      const { data: fullReview } = await db
+      const { data: fullReview, error: fullError } = await db
         .from('reviews')
         .select('*, projects(*)')
         .eq('id', fallbackReview.id)
         .single()
 
-      if (!fullReview) return NextResponse.json({ error: 'Review not found' }, { status: 404 })
+      if (fullError || !fullReview) return NextResponse.json({ error: 'Review not found' }, { status: 404 })
 
+      const reviewData = fullReview
       const { data: nikkels, error: nikkelError } = await db
         .from('nikkels')
-        .select('*, replies(*)')
-        .eq('review_id', fullReview.id)
+        .select('*')
+        .eq('review_id', reviewData.id)
         .order('created_at', { ascending: true })
+        if (nikkelError) return NextResponse.json({ error: nikkelError.message }, { status: 500 })
 
-      if (nikkelError) return NextResponse.json({ error: nikkelError.message }, { status: 500 })
+      const nikkelIds = (nikkels || []).map((n: any) => n.id)
+      let replies: any[] = []
+      if (nikkelIds.length > 0) {
+        const { data: r } = await db.from('replies').select('*').in('nikkel_id', nikkelIds).order('created_at', { ascending: true })
+        replies = r || []
+      }
 
-      const owner = await getProfile(fullReview.owner_id)
-      return NextResponse.json({ review: fullReview, project: fullReview.projects, owner, nikkels: nikkels || [] })
+      const nikkelsWithReplies = (nikkels || []).map((n: any) => ({ ...n, replies: replies.filter((r: any) => r.nikkel_id === n.id) }))
+      const owner = await getProfile(reviewData.owner_id)
+      return NextResponse.json({ review: reviewData, project: reviewData.projects, owner, nikkels: nikkelsWithReplies })
     }
 
     const { data: nikkels, error: nikkelError } = await db
       .from('nikkels')
-      .select('*, replies(*)')
-      .eq('review_id', review.id)
+      .select('*')
+      .eq('review_id', targetReview.id)
       .order('created_at', { ascending: true })
 
     if (nikkelError) return NextResponse.json({ error: nikkelError.message }, { status: 500 })
 
-    const owner = await getProfile(review.owner_id)
-    return NextResponse.json({ review, project: review.projects, owner, nikkels: nikkels || [] })
+    const nikkelIds = (nikkels || []).map((n: any) => n.id)
+    let replies: any[] = []
+    if (nikkelIds.length > 0) {
+      const { data: r } = await db.from('replies').select('*').in('nikkel_id', nikkelIds).order('created_at', { ascending: true })
+      replies = r || []
+    }
+
+    const nikkelsWithReplies = (nikkels || []).map((n: any) => ({ ...n, replies: replies.filter((r: any) => r.nikkel_id === n.id) }))
+    const owner = await getProfile(targetReview.owner_id)
+    return NextResponse.json({ review: targetReview, project: targetReview.projects, owner, nikkels: nikkelsWithReplies })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
