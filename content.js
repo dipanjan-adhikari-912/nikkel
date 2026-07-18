@@ -43,6 +43,8 @@ const BAR_HTML = `
     #pinsBadge { background: #6366f1; color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
     #shareBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 500; font-size: 12px; margin-left: auto; }
     #shareBtn:hover { background: #4f46e5; }
+    #dashboardLink { color: #94a3b8; text-decoration: none; font-size: 12px; margin-left: auto; margin-right: 6px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
+    #dashboardLink:hover { color: #e2e8f0; background: #1e293b; }
     #shareOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 2147483647; align-items: center; justify-content: center; }
     #shareOverlay.visible { display: flex; }
     #shareModal { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
@@ -78,6 +80,7 @@ const BAR_HTML = `
     </div>
     <div class="bar-sep"></div>
     <button id="pinsBtn">📍<span id="pinsBadge">0</span></button>
+    <a id="dashboardLink" href="#" target="_blank">Dashboard</a>
     <button id="shareBtn">🔗 Share</button>
   </div>
   <div id="shareOverlay">
@@ -270,12 +273,12 @@ function stopPolling() {
   }
 }
 
-function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly) {
+function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly, dashboardUrl) {
   if (barHost) {
     console.log('[Nikkel] injectBar: barHost already exists, skipping');
     return;
   }
-  console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly });
+  console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly, dashboardUrl });
   currentSessionId = sessionId || null;
   currentReviewId = reviewId || null;
   readOnly = isReadOnly || false;
@@ -290,6 +293,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   const inspLive = qs(shadow, 'inspLive');
   const pinsBtn = qs(shadow, 'pinsBtn');
   const pinsBadge = qs(shadow, 'pinsBadge');
+  const dashboardLink = qs(shadow, 'dashboardLink');
   const shareBtn = qs(shadow, 'shareBtn');
   const shareOverlay = qs(shadow, 'shareOverlay');
   const shareUrlTxt = qs(shadow, 'shareUrlTxt');
@@ -309,6 +313,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   setMode(initialMode || 'browse');
 
   if (projectNameEl) projectNameEl.textContent = projectName || '';
+  if (dashboardLink && dashboardUrl) { dashboardLink.href = dashboardUrl; }
   if (shareUrl && shareUrlTxt) {
     shareUrlTxt.value = shareUrl;
     if (shareMeta) shareMeta.textContent = projectName ? `Session: ${projectName}` : '';
@@ -903,7 +908,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     console.log('[Nikkel] received message', msg.type);
     switch (msg.type) {
       case 'ACTIVATE': {
-        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.mode || 'annotate', msg.payload.reviewId, msg.payload.readOnly);
+        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.mode || 'annotate', msg.payload.reviewId, msg.payload.readOnly, msg.payload.dashboardUrl);
         loadPinsForReview();
         return { ok: true };
       }
@@ -919,7 +924,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, url: location.href, title: document.title };
       }
       case 'LOAD_SESSION': {
-        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate', msg.payload.reviewId, msg.payload.viewOnly);
+        injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate', msg.payload.reviewId, msg.payload.viewOnly, msg.payload.dashboardUrl);
         removeAllPins();
         for (const n of msg.payload.nikkels) {
           addPin(n);
@@ -977,7 +982,7 @@ function resumeActiveReview() {
     chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
       if (chrome.runtime.lastError) return;
       if (res?.ok && res.project) {
-        if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly);
+        if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly, res.dashboardUrl);
         onPageReady(loadPinsForReview);
       }
     });

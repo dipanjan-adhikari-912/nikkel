@@ -12,8 +12,6 @@ const globalState = {
   user: null,
   token: null,
   refreshToken: null,
-  isAnonymous: false,
-  shareAsGuest: false,
   globalDisabled: false,
 };
 
@@ -26,30 +24,16 @@ function getTabState(tabId) {
   return tabState.get(tabId);
 }
 
-let pendingShare = null;
-
 function setSignedOut() {
   globalState.user = null;
   globalState.token = null;
   globalState.refreshToken = null;
-  globalState.isAnonymous = false;
-  globalState.shareAsGuest = false;
-}
-
-function setAnonymousUser(user, token, refreshToken) {
-  globalState.user = user;
-  globalState.token = token;
-  globalState.refreshToken = refreshToken;
-  globalState.isAnonymous = true;
-  globalState.shareAsGuest = false;
 }
 
 function setAuthenticatedUser(user, token, refreshToken) {
   globalState.user = user;
   globalState.token = token;
   globalState.refreshToken = refreshToken;
-  globalState.isAnonymous = false;
-  globalState.shareAsGuest = false;
 }
 
 function syncTokens(token, refreshToken) {
@@ -62,24 +46,20 @@ async function saveState() {
   for (const [tabId, ts] of tabState) {
     if (ts.project) tabObj[String(tabId)] = { mode: ts.mode, project: ts.project, review: ts.review, nikkels: ts.nikkels, readOnly: ts.readOnly };
   }
-  const { shareAsGuest, ...cleanState } = globalState;
   await chrome.storage.local.set({
-    nikkelState: cleanState,
+    nikkelState: globalState,
     nikkelTabState: tabObj,
-    pendingShare,
   });
 }
 
 async function loadState() {
-  const r = await chrome.storage.local.get(['nikkelState', 'nikkelTabState', 'pendingShare']);
+  const r = await chrome.storage.local.get(['nikkelState', 'nikkelTabState']);
   if (r.nikkelState) Object.assign(globalState, r.nikkelState);
-  globalState.shareAsGuest = false;
   if (r.nikkelTabState) {
     for (const [tabId, ts] of Object.entries(r.nikkelTabState)) {
       tabState.set(Number(tabId), ts);
     }
   }
-  if (r.pendingShare) pendingShare = r.pendingShare;
   const hasUser = !!globalState.user;
   const hasToken = !!globalState.token;
   const hasRefresh = !!globalState.refreshToken;
@@ -88,12 +68,6 @@ async function loadState() {
     await saveState();
     supabaseClient.setTokens(globalState.token, globalState.refreshToken);
     return;
-  }
-  // Migration: old code could save anon users with isAnonymous=false.
-  // If user has no email they're almost certainly anonymous, so force reset.
-  if (hasUser && !globalState.isAnonymous && !globalState.user?.email) {
-    setSignedOut();
-    await saveState();
   }
   supabaseClient.setTokens(globalState.token, globalState.refreshToken);
 }
@@ -136,62 +110,6 @@ async function upsertProfile(user, token) {
 
 let ready = loadState();
 
-async function completeUpgrade(anonToken, anonUserId, tabIdOverride) {
-  console.log('[BG] completeUpgrade called', { anonUserId, anonJwtSub: jwtSub(anonToken), newUserId: globalState.user?.id, newJwtSub: jwtSub(globalState.token), pendingShare });
-  const targetTabId = (pendingShare && pendingShare.tabId) || tabIdOverride;
-  if (!targetTabId || !anonToken || !anonUserId) {
-    console.log('[BG] completeUpgrade — missing params, skipping', { targetTabId, hasAnonToken: !!anonToken, anonUserId });
-    await saveState();
-    return null;
-  }
-  const ts = getTabState(targetTabId);
-  if (!ts.project) {
-    console.log('[BG] completeUpgrade — no project in tab state, skipping');
-    await saveState();
-    return null;
-  }
-  console.log('[BG] completeUpgrade — project state', { projectId: ts.project.id, projectOwnerId: ts.project.ownerId || ts.project.owner_id, reviewOwnerId: ts.review?.owner_id });
-  try {
-    console.log('[BG] completeUpgrade — PATCH project owner_id from', ts.project.ownerId || ts.project.owner_id, 'to', globalState.user.id, 'using anonToken sub:', jwtSub(anonToken));
-    await supabaseClient.request(`/rest/v1/projects?id=eq.${ts.project.id}`, {
-      method: 'PATCH', token: anonToken,
-      body: JSON.stringify({ owner_id: globalState.user.id }),
-    });
-    ts.project.ownerId = globalState.user.id;
-    console.log('[BG] completeUpgrade — project ownership transferred');
-  } catch (e) {
-    console.warn('[BG] Failed to transfer project ownership', e.message);
-  }
-  const anonReview = await shareService.ensureProjectReview(ts.project.id, anonUserId, anonToken);
-  console.log('[BG] completeUpgrade — anonReview:', { found: !!anonReview, id: anonReview?.id, owner_id: anonReview?.owner_id });
-  if (anonReview) {
-    console.log('[BG] completeUpgrade — transfer ownership via API, reviewId:', anonReview.id, 'newOwnerId:', globalState.user.id);
-    const apiRes = await fetch(`${API_URL}/api/reviews/${anonReview.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anonToken}` },
-      body: JSON.stringify({ newOwnerId: globalState.user.id }),
-    });
-    if (!apiRes.ok) {
-      const apiErr = await apiRes.text();
-      console.warn('[BG] completeUpgrade — API transfer failed', apiRes.status, apiErr);
-      return null;
-    }
-    ts.review = anonReview;
-    ts.review.owner_id = globalState.user.id;
-    console.log('[BG] completeUpgrade — review ownership transferred');
-  }
-  let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
-  if (!review) return null;
-  console.log('[BG] completeUpgrade — final review', { reviewId: review.id, owner_id: review.owner_id });
-  ts.review = review;
-  const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
-  const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
-  pendingShare = null;
-  await saveState();
-  console.log('[BG] completeUpgrade — done, shareUrl:', shareUrl);
-  return shareUrl;
-}
-
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   await ready;
   if (globalState.globalDisabled) return;
@@ -203,7 +121,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (ts.project) {
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
-      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly },
+      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
     });
   }
 });
@@ -229,27 +147,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE':
-        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, isAnonymous: globalState.isAnonymous, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false };
-
-      case 'INIT_ANONYMOUS': {
-        if (globalState.token && globalState.user) return { ok: true, user: globalState.user, isAnonymous: globalState.isAnonymous };
-        const result = await authService.signInAnonymously();
-        setAnonymousUser(result.user, result.token, result.refreshToken);
-        await saveState();
-        return { ok: true, user: result.user, isAnonymous: true };
-      }
+        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token: globalState.token || '' };
 
       case 'START_REVIEW': {
         if (globalState.globalDisabled) return { ok: false, error: 'Nikkel is disabled' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to start a review' };
         const { tabId: tId, title, url } = msg.payload;
-        console.log('[BG] START_REVIEW — isAnonymous:', globalState.isAnonymous, 'user.id:', globalState.user?.id, 'user.email:', globalState.user?.email, 'JWT sub:', jwtSub(globalState.token));
-        if (!globalState.token) {
-          const anon = await authService.signInAnonymously();
-          setAnonymousUser(anon.user, anon.token, anon.refreshToken);
-          await saveState();
-          supabaseClient.setTokens(globalState.token, globalState.refreshToken);
-          console.log('[BG] START_REVIEW — after anon sign-in, user.id:', globalState.user?.id, 'JWT sub:', jwtSub(globalState.token));
-        }
+        console.log('[BG] START_REVIEW — user.id:', globalState.user?.id, 'email:', globalState.user?.email, 'JWT sub:', jwtSub(globalState.token));
         const project = await projectService.create(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
         console.log('[BG] START_REVIEW — project created', { projectId: project.id, owner_id: project.ownerId || project.owner_id });
         const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token);
@@ -265,7 +169,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           await sendToTab(tId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '' },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         }
         return { ok: true, project, review };
@@ -362,16 +266,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'SIGN_UP_EMAIL': {
         const { email: regEmail, password: regPassword } = msg.payload || {};
         if (!regEmail || !regPassword) return { ok: false, error: 'Email and password required' };
-        const anonTokenReg = globalState.token;
-        const anonUserIdReg = globalState.user?.id;
         let regResult;
         try { regResult = await authService.signUpWithEmail(regEmail, regPassword); }
         catch (e) { return { ok: false, error: e.message }; }
         setAuthenticatedUser(regResult.user, regResult.token, regResult.refreshToken);
         supabaseClient.setTokens(regResult.token, regResult.refreshToken);
         await upsertProfile(globalState.user, globalState.token);
-        const shareUrlReg = await completeUpgrade(anonTokenReg, anonUserIdReg, tabId);
-        if (shareUrlReg) return { ok: true, user: globalState.user, shareUrl: shareUrlReg };
         await saveState();
         return { ok: true, user: globalState.user };
       }
@@ -379,22 +279,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'SIGN_IN_EMAIL': {
         const { email: signEmail, password: signPassword } = msg.payload || {};
         if (!signEmail || !signPassword) return { ok: false, error: 'Email and password required' };
-        const anonTokenSign = globalState.token;
-        const anonUserIdSign = globalState.user?.id;
         let signResult;
         try { signResult = await authService.signInWithEmail(signEmail, signPassword); }
         catch (e) { return { ok: false, error: e.message }; }
         setAuthenticatedUser(signResult.user, signResult.token, signResult.refreshToken);
         supabaseClient.setTokens(signResult.token, signResult.refreshToken);
         await upsertProfile(globalState.user, globalState.token);
-        const shareUrlSign = await completeUpgrade(anonTokenSign, anonUserIdSign, tabId);
-        if (shareUrlSign) return { ok: true, user: globalState.user, shareUrl: shareUrlSign };
         await saveState();
         return { ok: true, user: globalState.user };
       }
 
       case 'SIGN_IN_GOOGLE': {
-        console.log('[BG] SIGN_IN_GOOGLE — isAnonymous:', globalState.isAnonymous, 'anon user.id:', globalState.user?.id, 'anon email:', globalState.user?.email, 'anon JWT sub:', jwtSub(globalState.token));
         const redirectUrl = chrome.identity.getRedirectURL();
         const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
         let redirect;
@@ -410,18 +305,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const refreshToken = params.get('refresh_token');
         if (!accessToken) return { ok: false, error: 'No access token in response' };
 
-        const anonToken = globalState.token;
-        const anonUserId = globalState.user?.id;
-
         const userInfo = await authService.getUserInfo(accessToken);
         console.log('[BG] SIGN_IN_GOOGLE — Google user info', { id: userInfo.id, email: userInfo.email, name: userInfo.name });
         supabaseClient.setTokens(accessToken, refreshToken);
         setAuthenticatedUser(userInfo, accessToken, refreshToken);
-        console.log('[BG] SIGN_IN_GOOGLE — after setAuthenticatedUser', { user: globalState.user?.id, email: globalState.user?.email, 'JWT sub': jwtSub(globalState.token) });
         await upsertProfile(globalState.user, globalState.token);
-
-        const shareUrl = await completeUpgrade(anonToken, anonUserId, tabId);
-        if (shareUrl) return { ok: true, user: globalState.user, shareUrl };
         await saveState();
         return { ok: true, user: globalState.user };
       }
@@ -433,7 +321,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (tab.project) {
             await sendToTab(tId, {
               type: 'ACTIVATE',
-              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly },
+              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
             });
           }
         }
@@ -524,7 +412,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await saveState();
           await sendToTab(resumeTabId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: null, shareUrl: '', mode: 'browse', readOnly: false },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: null, shareUrl: '', mode: 'browse', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
           return { ok: true };
         } catch (e) {
@@ -583,7 +471,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             ts.nikkels = nikkels;
             await sendToTab(tab.id, {
               type: 'LOAD_SESSION',
-              payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels },
+              payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
             });
           } catch {}
         }
@@ -596,25 +484,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const tab = getTabState(srcTabId);
         if (!tab.project) return { ok: false, error: 'No active project' };
         if (!tab.nikkels || tab.nikkels.length === 0) return { ok: false, error: 'Add at least one pin before sharing' };
-        console.log('[BG] SHARE — isAnonymous:', globalState.isAnonymous, 'user.id:', globalState.user?.id, 'user.email:', globalState.user?.email, 'JWT sub:', jwtSub(globalState.token));
-        console.log('[BG] SHARE — tab state', { projectId: tab.project.id, projectOwnerId: tab.project.ownerId || tab.project.owner_id, reviewOwnerId: tab.review?.owner_id, reviewId: tab.review?.id });
-
-        if (globalState.isAnonymous || !globalState.user?.email) {
-          if (!globalState.isAnonymous) {
-            console.warn('[BG] SHARE — isAnonymous=false but no email, treating as anonymous');
-          }
-          pendingShare = { tabId: srcTabId };
-          await saveState();
-          console.log('[BG] SHARE — deferred, pendingShare set');
-          return { ok: true, needsAuth: true };
-        }
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to share' };
 
         let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
         if (!review) {
           console.error('[BG] SHARE: ensureProjectReview returned null');
           return { ok: false, error: 'Failed to create review' };
         }
-        console.log('[BG] SHARE — review', { reviewId: review.id, owner_id: review.owner_id, reused: !!tab.review?.id });
         tab.review = review;
 
         const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
@@ -625,8 +501,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'GET_USER_PROJECTS': {
         if (!globalState.token || !globalState.user?.id) return { ok: true, projects: [] };
         try {
-          const rows = await supabaseClient.request(`/rest/v1/projects?owner_id=eq.${globalState.user.id}&order=created_at.desc&limit=50`, { token: globalState.token });
-          return { ok: true, projects: Array.isArray(rows) ? rows : [] };
+          const projects = await supabaseClient.request(`/rest/v1/projects?select=*&owner_id=eq.${globalState.user.id}&order=created_at.desc&limit=50`, { token: globalState.token });
+          const collabRows = await supabaseClient.request(`/rest/v1/project_collaborators?select=project_id&user_id=eq.${globalState.user.id}`, { token: globalState.token });
+          return { ok: true, projects: Array.isArray(projects) ? projects : [] };
         } catch (e) {
           console.warn('[BG] GET_USER_PROJECTS failed', e.message);
           return { ok: true, projects: [] };
