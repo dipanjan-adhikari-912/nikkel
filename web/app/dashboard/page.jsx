@@ -256,12 +256,17 @@ function ProjectCard({ project, onCopyShare, onDelete }) {
       {pages.length > 0 && (
         <div style={{ margin: '4px 10px 0', borderTop: '1px solid #334155', paddingTop: 6 }}>
           {pages.map((page, i) => (
-            <div
+            <a
               key={i}
+              href={page.pageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 4,
-                fontSize: 13, color: '#cbd5e1', cursor: 'default',
+                fontSize: 13, color: '#cbd5e1', textDecoration: 'none', cursor: 'pointer',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#334155' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
             >
               <span style={{ color: '#475569', flexShrink: 0, fontSize: 11 }}>📄</span>
               <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: 12 }}>
@@ -270,7 +275,7 @@ function ProjectCard({ project, onCopyShare, onDelete }) {
               <span style={{ padding: '1px 7px', borderRadius: 8, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
                 {page.nikkelCount}
               </span>
-            </div>
+            </a>
           ))}
         </div>
       )}

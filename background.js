@@ -13,6 +13,7 @@ const globalState = {
   token: null,
   refreshToken: null,
   globalDisabled: false,
+  lastProject: null, // { projectId, reviewId, baseUrl, title } — persisted, used by tabs.onUpdated to auto-resume
 };
 
 const tabState = new Map();
@@ -86,6 +87,12 @@ async function sendToTab(tabId, msg, retries = 5) {
   return null;
 }
 
+function setLastProject(project, review) {
+  if (project && project.id) {
+    globalState.lastProject = { projectId: project.id, reviewId: review?.id || null, baseUrl: project.base_url || project.baseUrl || '', title: project.title || '' };
+  }
+}
+
 async function upsertProfile(user, token) {
   if (!user || !token) return;
   try {
@@ -130,6 +137,23 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.url) {
     const ts = getTabState(tabId);
     ts.url = changeInfo.url;
+    if (!ts.project && globalState.lastProject && globalState.token) {
+      const base = globalState.lastProject.baseUrl?.replace(/\/+$/, '');
+      const url = changeInfo.url.replace(/\/+$/, '');
+      if (base && url.startsWith(base)) {
+        ts.project = { id: globalState.lastProject.projectId, title: globalState.lastProject.title, base_url: globalState.lastProject.baseUrl };
+        ts.review = globalState.lastProject.reviewId ? { id: globalState.lastProject.reviewId } : null;
+        setLastProject(ts.project, ts.review);
+        ts.mode = 'annotate';
+        ts.nikkels = [];
+        ts.readOnly = false;
+        saveState();
+        sendToTab(tabId, {
+          type: 'ACTIVATE',
+          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId: globalState.lastProject.reviewId, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+        });
+      }
+    }
   }
 });
 
@@ -165,6 +189,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         tab.mode = 'annotate';
         tab.nikkels = [];
         tab.url = url || tab.url;
+        setLastProject(project, review);
         await saveState();
         if (tId) {
           await sendToTab(tId, {
@@ -361,6 +386,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         ts.mode = 'browse';
         ts.url = targetUrl;
         ts.readOnly = true;
+        setLastProject(ts.project, review);
         await saveState();
 
         return { ok: true, targetUrl };
@@ -420,6 +446,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           ts.mode = 'browse';
           ts.url = ts.url || '';
           ts.readOnly = false;
+          setLastProject(ts.project, null);
           await saveState();
           await sendToTab(resumeTabId, {
             type: 'ACTIVATE',
@@ -434,6 +461,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case 'SIGN_OUT': {
         setSignedOut();
+        globalState.lastProject = null;
         tabState.clear();
         await saveState();
         return { ok: true };
@@ -474,6 +502,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         getTabState(tab.id).nikkels = [];
         getTabState(tab.id).url = targetUrl;
         getTabState(tab.id).readOnly = true;
+        setLastProject(project, review);
         await saveState();
         if (reused) {
           const ts = getTabState(tab.id);
