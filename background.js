@@ -73,15 +73,13 @@ async function loadState() {
   supabaseClient.setTokens(globalState.token, globalState.refreshToken);
 }
 
-async function sendToTab(tabId, msg, retries = 5) {
+async function sendToTab(tabId, msg, retries = 8) {
   for (let i = 0; i < retries; i++) {
     try {
       return await chrome.tabs.sendMessage(tabId, msg);
     } catch {
-      if (i === 0) {
-        try { await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }); } catch {}
-      }
-      if (i < retries - 1) await new Promise(r => setTimeout(r, 200));
+      try { await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }); } catch {}
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 500));
     }
   }
   return null;
