@@ -187,7 +187,15 @@ export default function DashboardPage() {
               background: selected?.id === p.id ? '#eef2ff' : '#fff',
               border: selected?.id === p.id ? '1px solid #6366f1' : '1px solid #e5e7eb'
             }}>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{p.name}</div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>
+              {p.name}
+              <span style={{
+                marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600,
+                background: p.role === 'owner' ? '#eef2ff' : '#fef3c7',
+                color: p.role === 'owner' ? '#4338ca' : '#92400e',
+                textTransform: 'uppercase'
+              }}>{p.role || 'owner'}</span>
+            </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{p.url}</div>
             {summaries[p.id] && (
               <div style={{ display: 'flex', gap: 8, fontSize: 11, color: '#6b7280' }}>
@@ -199,7 +207,9 @@ export default function DashboardPage() {
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={e => { e.stopPropagation(); copyShareLink(p.id) }} style={{ padding: '3px 8px', border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>Copy Share Link</button>
-              <button onClick={e => { e.stopPropagation(); deleteProject(p.id) }} style={{ padding: '3px 8px', border: '1px solid #fca5a5', borderRadius: 4, background: '#fff', color: '#dc2626', cursor: 'pointer', fontSize: 11 }}>Delete</button>
+              {(p.role || 'owner') === 'owner' && (
+                <button onClick={e => { e.stopPropagation(); deleteProject(p.id) }} style={{ padding: '3px 8px', border: '1px solid #fca5a5', borderRadius: 4, background: '#fff', color: '#dc2626', cursor: 'pointer', fontSize: 11 }}>Delete</button>
+              )}
             </div>
           </div>
         ))}

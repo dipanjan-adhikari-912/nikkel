@@ -2,18 +2,22 @@
 
 import { useEffect, useState, useRef } from 'react'
 
-
-
 export default function BoardPage({ params }) {
   const [project, setProject] = useState(null)
   const [nikkels, setNikkels] = useState([])
   const [activeNikkel, setActiveNikkel] = useState(null)
   const [replyText, setReplyText] = useState('')
-  const [replyName, setReplyName] = useState('')
-  const [replyEmail, setReplyEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [token, setToken] = useState(null)
+  const [collaboratorPrompt, setCollaboratorPrompt] = useState(null)
+  const [joining, setJoining] = useState(false)
   const iframeRef = useRef(null)
+
+  useEffect(() => {
+    const t = localStorage.getItem('nikkel_token')
+    if (t) setToken(t)
+  }, [])
 
   useEffect(() => {
     fetch(`/api/board/${params.token}`)
@@ -38,18 +42,15 @@ export default function BoardPage({ params }) {
 
   async function submitReply(e) {
     e.preventDefault()
-    if (!replyText.trim() || !replyName.trim()) return
+    if (!replyText.trim()) return
+    if (!token) return
     setSubmitting(true)
+    setCollaboratorPrompt(null)
     try {
       const res = await fetch(`/api/board/${params.token}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nikkelId: activeNikkel.id,
-          authorName: replyName,
-          authorEmail: replyEmail,
-          text: replyText
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ nikkelId: activeNikkel.id, text: replyText })
       })
       const data = await res.json()
       if (res.ok) {
@@ -64,9 +65,57 @@ export default function BoardPage({ params }) {
           ...prev,
           replies: [...(prev.replies || []), data]
         }))
+      } else if (res.status === 403 && data.error === 'not_a_collaborator') {
+        setCollaboratorPrompt({ projectId: data.projectId, retryData: { nikkelId: activeNikkel.id, text: replyText } })
+      } else {
+        setError(data.error || `Request failed (${res.status})`)
       }
-    } catch {}
+    } catch {
+      setError('Network error submitting reply')
+    }
     setSubmitting(false)
+  }
+
+  async function joinWorkspace() {
+    if (!collaboratorPrompt || !token) return
+    setJoining(true)
+    try {
+      const res = await fetch(`/api/projects/${collaboratorPrompt.projectId}/collaborators`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        setCollaboratorPrompt(null)
+        const replyRes = await fetch(`/api/board/${params.token}/reply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(collaboratorPrompt.retryData)
+        })
+        if (replyRes.ok) {
+          const data = await replyRes.json()
+          setReplyText('')
+          const updated = nikkels.map(n =>
+            n.id === activeNikkel.id
+              ? { ...n, replies: [...(n.replies || []), data] }
+              : n
+          )
+          setNikkels(updated)
+          setActiveNikkel(prev => ({
+            ...prev,
+            replies: [...(prev.replies || []), data]
+          }))
+        } else {
+          const d = await replyRes.json()
+          setError(d.error || 'Reply failed after joining')
+        }
+      } else {
+        const d = await res.json()
+        setError(d.error || 'Failed to join workspace')
+      }
+    } catch {
+      setError('Network error joining workspace')
+    }
+    setJoining(false)
   }
 
   if (error) {
@@ -124,15 +173,15 @@ export default function BoardPage({ params }) {
         {activeNikkel && (
           <CommentBubble
             nikkel={activeNikkel}
-            onClose={() => setActiveNikkel(null)}
+            onClose={() => { setActiveNikkel(null); setCollaboratorPrompt(null) }}
             onSubmit={submitReply}
             replyText={replyText}
             setReplyText={setReplyText}
-            replyName={replyName}
-            setReplyName={setReplyName}
-            replyEmail={replyEmail}
-            setReplyEmail={setReplyEmail}
             submitting={submitting}
+            token={token}
+            collaboratorPrompt={collaboratorPrompt}
+            onJoinWorkspace={joinWorkspace}
+            joining={joining}
           />
         )}
       </div>
@@ -160,7 +209,7 @@ function NikkelPin({ nikkel }) {
   )
 }
 
-function CommentBubble({ nikkel, onClose, onSubmit, replyText, setReplyText, replyName, setReplyName, replyEmail, setReplyEmail, submitting }) {
+function CommentBubble({ nikkel, onClose, onSubmit, replyText, setReplyText, submitting, token, collaboratorPrompt, onJoinWorkspace, joining }) {
   return (
     <div style={{
       position: 'absolute', bottom: 20, right: 20, width: 360, maxHeight: 480,
@@ -218,51 +267,58 @@ function CommentBubble({ nikkel, onClose, onSubmit, replyText, setReplyText, rep
         </div>
       )}
 
+      {/* Collaborator prompt */}
+      {collaboratorPrompt && (
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', background: '#fffbeb' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 13, color: '#92400e' }}>
+            You need to join this project's workspace to reply.
+          </p>
+          <button
+            onClick={onJoinWorkspace}
+            disabled={joining}
+            style={{
+              width: '100%', padding: '8px 16px', border: 'none', borderRadius: 6,
+              background: joining ? '#9ca3af' : '#6366f1', color: '#fff',
+              fontWeight: 600, cursor: joining ? 'not-allowed' : 'pointer', fontSize: 13
+            }}
+          >
+            {joining ? 'Joining...' : 'Add to my workspace'}
+          </button>
+        </div>
+      )}
+
       {/* Reply form */}
-      <form onSubmit={onSubmit} style={{ padding: '12px 16px' }}>
-        <input
-          placeholder="Your name"
-          value={replyName}
-          onChange={e => setReplyName(e.target.value)}
-          required
-          style={{
-            width: '100%', padding: '8px 12px', border: '1px solid #d1d5db',
-            borderRadius: 6, fontSize: 13, marginBottom: 6, fontFamily: 'inherit', boxSizing: 'border-box'
-          }}
-        />
-        <input
-          placeholder="Email (optional)"
-          type="email"
-          value={replyEmail}
-          onChange={e => setReplyEmail(e.target.value)}
-          style={{
-            width: '100%', padding: '8px 12px', border: '1px solid #d1d5db',
-            borderRadius: 6, fontSize: 13, marginBottom: 6, fontFamily: 'inherit', boxSizing: 'border-box'
-          }}
-        />
-        <textarea
-          placeholder="Write a reply..."
-          value={replyText}
-          onChange={e => setReplyText(e.target.value)}
-          required
-          rows={3}
-          style={{
-            width: '100%', padding: '8px 12px', border: '1px solid #d1d5db',
-            borderRadius: 6, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 8
-          }}
-        />
-        <button
-          type="submit"
-          disabled={submitting}
-          style={{
-            width: '100%', padding: '8px 16px', border: 'none', borderRadius: 6,
-            background: submitting ? '#9ca3af' : '#6366f1', color: '#fff',
-            fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', fontSize: 13
-          }}
-        >
-          {submitting ? 'Submitting...' : 'Reply'}
-        </button>
-      </form>
+      {!collaboratorPrompt && (
+        <form onSubmit={onSubmit} style={{ padding: '12px 16px' }}>
+          {!token && (
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
+              <a href="/dashboard" style={{ color: '#6366f1' }}>Sign in</a> to reply
+            </p>
+          )}
+          <textarea
+            placeholder="Write a reply..."
+            value={replyText}
+            onChange={e => setReplyText(e.target.value)}
+            required
+            rows={3}
+            style={{
+              width: '100%', padding: '8px 12px', border: '1px solid #d1d5db',
+              borderRadius: 6, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 8
+            }}
+          />
+          <button
+            type="submit"
+            disabled={submitting || !token}
+            style={{
+              width: '100%', padding: '8px 16px', border: 'none', borderRadius: 6,
+              background: submitting || !token ? '#9ca3af' : '#6366f1', color: '#fff',
+              fontWeight: 600, cursor: submitting || !token ? 'not-allowed' : 'pointer', fontSize: 13
+            }}
+          >
+            {!token ? 'Sign in to reply' : submitting ? 'Submitting...' : 'Reply'}
+          </button>
+        </form>
+      )}
     </div>
   )
 }
