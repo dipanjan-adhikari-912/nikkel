@@ -33,12 +33,6 @@ create policy "Owners can update projects"
   on projects for update
   using (auth.uid() = owner_id);
 
-create policy "Anyone can view projects linked to public reviews"
-  on projects for select
-  using (exists (
-    select 1 from reviews where reviews.project_id = projects.id and visibility = 'public'
-  ));
-
 -- Reviews (shareable links, belong to a project)
 create table reviews (
   id uuid primary key default gen_random_uuid(),
@@ -66,6 +60,12 @@ create policy "Anyone can create reviews"
 create policy "Owners can update own reviews"
   on reviews for update
   using (auth.uid() = owner_id);
+
+create policy "Anyone can view projects linked to public reviews"
+  on projects for select
+  using (exists (
+    select 1 from reviews where reviews.project_id = projects.id and visibility = 'public'
+  ));
 
 create index if not exists reviews_share_token_idx on reviews (share_token);
 create index if not exists reviews_project_id_idx on reviews (project_id);
