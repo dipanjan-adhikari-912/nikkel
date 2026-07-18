@@ -203,7 +203,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (ts.project) {
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
-      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly },
+      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard` },
     });
   }
 });
@@ -265,7 +265,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           await sendToTab(tId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '' },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '', dashboardUrl: `${VIEWER_BASE}/dashboard` },
           });
         }
         return { ok: true, project, review };
@@ -433,7 +433,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (tab.project) {
             await sendToTab(tId, {
               type: 'ACTIVATE',
-              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly },
+              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard` },
             });
           }
         }
@@ -524,7 +524,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await saveState();
           await sendToTab(resumeTabId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: null, shareUrl: '', mode: 'browse', readOnly: false },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: null, shareUrl: '', mode: 'browse', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard` },
           });
           return { ok: true };
         } catch (e) {
@@ -583,7 +583,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             ts.nikkels = nikkels;
             await sendToTab(tab.id, {
               type: 'LOAD_SESSION',
-              payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels },
+              payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard` },
             });
           } catch {}
         }

@@ -343,6 +343,10 @@ $('signOutLink').addEventListener('click', async () => {
   init();
 });
 
+$('dashboardLink').addEventListener('click', () => {
+  chrome.tabs.create({ url: 'https://nikkel-wheat.vercel.app/dashboard' });
+});
+
 $('settingsLink').addEventListener('click', () => {
   chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
 });
