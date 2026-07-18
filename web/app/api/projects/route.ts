@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await db
     .from('projects')
     .select('*')
-    .eq('org_id', auth.profile?.org_id)
+    .eq('owner_id', auth.user.id)
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -20,14 +20,14 @@ export async function POST(request: NextRequest) {
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
-  const { name, url } = await request.json()
-  if (!name || !url) {
-    return NextResponse.json({ error: 'name and url are required' }, { status: 400 })
+  const { title, baseUrl } = await request.json()
+  if (!title || !baseUrl) {
+    return NextResponse.json({ error: 'title and baseUrl are required' }, { status: 400 })
   }
 
   const { data, error } = await db
     .from('projects')
-    .insert({ org_id: auth.profile?.org_id, name, url })
+    .insert({ owner_id: auth.user.id, title, base_url: baseUrl })
     .select()
     .single()
 

@@ -20,42 +20,30 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
-  const { pageUrl, selector, coordX, coordY, elementTag, elementText, commentText, screenshotBase64 } = await request.json()
+  const { pageUrl, selector, coordX, coordY, elementTag, elementText, commentText } = await request.json()
   if (!pageUrl || !commentText) {
     return NextResponse.json({ error: 'pageUrl and commentText are required' }, { status: 400 })
   }
 
-  let screenshotUrl = null
-  if (screenshotBase64) {
-    try {
-      const base64String = screenshotBase64.replace(/^data:image\/\w+;base64,/, '')
-      const buffer = Buffer.from(base64String, 'base64')
-      const filename = `screenshots/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
-      const { data: uploadData, error: uploadError } = await db.storage
-        .from('screenshots')
-        .upload(filename, buffer, { contentType: 'image/jpeg', upsert: false })
-
-      if (!uploadError) {
-        const { data: { publicUrl } } = db.storage.from('screenshots').getPublicUrl(uploadData.path)
-        screenshotUrl = publicUrl
-      }
-    } catch { /* screenshot upload failed silently */ }
-  }
+  const { count } = await db
+    .from('nikkels')
+    .select('id', { count: 'exact', head: true })
+    .eq('review_id', params.reviewId)
 
   const { data, error } = await db
     .from('nikkels')
     .insert({
       review_id: params.reviewId,
+      owner_id: auth.user.id,
       page_url: pageUrl,
-      selector,
-      coord_x: coordX,
-      coord_y: coordY,
-      element_tag: elementTag,
+      dom_selector: selector,
+      x: coordX,
+      y: coordY,
+      tag: elementTag,
       element_text: elementText,
-      comment_text: commentText,
-      screenshot_url: screenshotUrl,
-      author_id: auth.user.id,
-      author_name: auth.profile?.full_name || 'Anonymous'
+      comment: commentText,
+      idx: (count ?? 0) + 1,
+      screenshot_url: null,
     })
     .select()
     .single()
