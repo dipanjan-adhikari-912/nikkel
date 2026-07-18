@@ -256,7 +256,7 @@ function startPolling() {
   stopPolling();
   if (!currentSessionId) return;
   pollInterval = setInterval(() => {
-    bgMsg({ type: 'GET_NIKKELS' }, (res) => {
+    bgMsg({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (res) => {
       if (res?.ok && res.nikkels) {
         res.nikkels.forEach((n) => {
           if (!pins.find((p) => p.id === n.id)) addPin(n);
@@ -550,8 +550,7 @@ function injectPopover(pageX, pageY, nikkel) {
   if (nvNum) nvNum.textContent = `#${nikkel.idx || '?'}`;
   if (nvEl) nvEl.textContent = `<${nikkel.tag || '?'}> ${(nikkel.elementText || '').slice(0, 60)}`;
   if (nvComment) nvComment.textContent = nikkel.comment || '';
-  const pageLabel = (nikkel.pageUrl || '').split('?')[0] === location.href.split('?')[0] ? '' : `Page: ${nikkel.pageUrl}`;
-  if (nvMeta) nvMeta.textContent = [pageLabel, nikkel.selector ? `Selector: ${nikkel.selector}` : ''].filter(Boolean).join(' · ');
+  if (nvMeta) nvMeta.textContent = nikkel.selector ? `Selector: ${nikkel.selector}` : '';
 
   let x = pageX;
   let y = pageY;
@@ -702,7 +701,6 @@ function addPin(nikkel) {
   const px = (nikkel.pageX || 0) - 13;
   const py = (nikkel.pageY || 0) - 13;
   const pc = pinColor(nikkel.userId);
-  const isCurrentPage = (nikkel.pageUrl || '').split('?')[0] === location.href.split('?')[0];
   pin.style.cssText = `
     position: absolute;
     left: ${px}px;
@@ -724,7 +722,6 @@ function addPin(nikkel) {
     transition: transform .15s, box-shadow .15s;
     z-index: 1;
     user-select: none;
-    ${isCurrentPage ? '' : 'opacity:0.45;outline:1px dashed rgba(255,255,255,.3);outline-offset:-1px;'}
   `;
   pin.addEventListener('mouseenter', () => {
     pin.style.transform = 'scale(1.2)';
@@ -826,7 +823,6 @@ async function handleDocumentClick(e) {
     selector: result.elementInfo.selector,
     elementText: result.elementInfo.elementText,
     comment: result.comment,
-    idx: pins.length + 1,
   };
 
   console.log('[Nikkel] submitting nikkel', nikkel);
@@ -960,7 +956,7 @@ function loadPinsForReview() {
   setBadgeText('...');
   if (!isValid()) return;
   try {
-    chrome.runtime.sendMessage({ type: 'GET_NIKKELS' }, (nres) => {
+    chrome.runtime.sendMessage({ type: 'GET_NIKKELS', payload: { pageUrl: location.href } }, (nres) => {
       if (chrome.runtime.lastError) return;
       if (nres?.ok && nres.nikkels) {
         removeAllPins();

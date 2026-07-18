@@ -231,6 +231,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return { ok: false, error: 'Project has been deleted. Starting a new review.' };
         }
         const d = msg.payload.nikkel;
+        let nextIdx = 1;
+        try {
+          const existing = await supabaseClient.request(`/rest/v1/nikkels?review_id=eq.${tab.review.id}&select=idx&order=idx.desc&limit=1`, { token: globalState.token });
+          if (Array.isArray(existing) && existing.length > 0 && existing[0].idx != null) nextIdx = existing[0].idx + 1;
+        } catch {}
         const saved = await pinService.create({
           reviewId: tab.review.id,
           pageUrl: d.pageUrl,
@@ -242,7 +247,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           tag: d.tag,
           elementText: d.elementText,
           comment: d.comment,
-          idx: d.idx,
+          idx: nextIdx,
         }, globalState.token);
         tab.nikkels.push(saved);
         await saveState();
@@ -258,7 +263,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
           return { ok: true, nikkels: [] };
         }
-        const nikkels = await pinService.findByReview(tab.review.id, {}, globalState.token);
+        const pageUrl = msg.payload?.pageUrl || tab.url;
+        const nikkels = await pinService.findByReview(tab.review.id, { pageUrl }, globalState.token);
         tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
