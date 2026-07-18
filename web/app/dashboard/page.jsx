@@ -4,15 +4,16 @@ import { useEffect, useState, useCallback } from 'react'
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="#334155" width="40" height="40" rx="20"/><text x="20" y="26" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif">?</text></svg>')
 
-function getTokenFromHash() {
+function getToken() {
   const hash = window.location.hash
   const match = hash.match(/token=([^&]+)/)
   if (match) {
     const t = decodeURIComponent(match[1])
     window.location.hash = ''
+    try { sessionStorage.setItem('nikkel_token', t) } catch {}
     return t
   }
-  return null
+  try { return sessionStorage.getItem('nikkel_token') } catch { return null }
 }
 
 function api(token, path, opts = {}) {
@@ -35,7 +36,7 @@ export default function DashboardPage() {
   const [nav, setNav] = useState('home')
 
   useEffect(() => {
-    const t = getTokenFromHash()
+    const t = getToken()
     if (t) setToken(t)
   }, [])
 
