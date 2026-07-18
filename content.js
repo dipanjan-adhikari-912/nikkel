@@ -342,7 +342,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   }
 
   if (shareBtn) {
-    shareBtn.addEventListener('click', () => {
+    shareBtn.addEventListener('click', async () => {
       if (pins.length === 0) {
         shareBtn.textContent = '🔗 No pins yet';
         shareBtn.style.opacity = '0.6';
@@ -352,7 +352,30 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
         }, 2000);
         return;
       }
-      if (shareOverlay) shareOverlay.classList.add('visible');
+      if (!shareOverlay) return;
+      shareOverlay.classList.add('visible');
+      if (shareAuthSection) shareAuthSection.style.display = 'none';
+      if (shareUrlSection) shareUrlSection.style.display = 'none';
+      if (shareMeta) shareMeta.textContent = '';
+
+      let shareRes;
+      try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { shareRes = null; }
+
+      if (shareRes?.ok && shareRes.shareUrl) {
+        if (shareUrlSection) shareUrlSection.style.display = '';
+        if (shareUrlTxt) shareUrlTxt.value = shareRes.shareUrl;
+        if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
+        if (copyBtn) { try { navigator.clipboard.writeText(shareRes.shareUrl); } catch {} copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500); }
+        return;
+      }
+
+      if (shareRes?.ok && shareRes.needsAuth) {
+        if (shareAuthSection) shareAuthSection.style.display = '';
+        return;
+      }
+
+      if (shareMeta) shareMeta.textContent = shareRes?.error || 'Cannot share right now.';
+      if (shareAuthSection) shareAuthSection.style.display = '';
     });
   }
 
@@ -382,38 +405,23 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
     shareGoogleBtn.addEventListener('click', async () => {
       shareGoogleBtn.disabled = true;
       shareGoogleBtn.textContent = 'Connecting…';
+      if (shareMeta) shareMeta.textContent = '';
 
-      const showUrl = (url) => {
-        if (shareUrlSection && shareAuthSection) {
-          shareUrlSection.style.display = '';
-          shareAuthSection.style.display = 'none';
-        }
-        if (shareUrlTxt) shareUrlTxt.value = url;
-        if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
-        if (copyBtn) {
-          try { navigator.clipboard.writeText(url); } catch {}
-          copyBtn.textContent = 'Copied!';
-          setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
-        }
-      };
-
-      const showError = (msg) => {
-        shareGoogleBtn.disabled = false;
-        shareGoogleBtn.textContent = 'Continue with Google';
-        if (shareMeta) shareMeta.textContent = msg;
-      };
-
-      // Step 1: try SHARE — sets pendingShare if anonymous
-      let shareRes;
-      try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { return showError('Extension context lost.'); }
-      if (shareRes?.ok && shareRes.shareUrl) return showUrl(shareRes.shareUrl);
-      if (!shareRes?.ok) return showError(shareRes?.error || 'Failed to create share link.');
-
-      // needsAuth was returned — authenticate, background will create review via pendingShare
       let authRes;
-      try { authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' }); } catch { return showError('Extension context lost.'); }
-      if (authRes?.ok && authRes.shareUrl) return showUrl(authRes.shareUrl);
-      showError(authRes?.ok ? 'Signed in. Click Share again to generate a link.' : (authRes?.error || 'Google sign-in failed.'));
+      try { authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' }); } catch { authRes = null; }
+
+      if (authRes?.ok && authRes.shareUrl) {
+        if (shareUrlSection) shareUrlSection.style.display = '';
+        if (shareAuthSection) shareAuthSection.style.display = 'none';
+        if (shareUrlTxt) shareUrlTxt.value = authRes.shareUrl;
+        if (shareMeta) shareMeta.textContent = 'Review saved and shareable!';
+        if (copyBtn) { try { navigator.clipboard.writeText(authRes.shareUrl); } catch {} copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500); }
+        return;
+      }
+
+      shareGoogleBtn.disabled = false;
+      shareGoogleBtn.textContent = 'Continue with Google';
+      if (shareMeta) shareMeta.textContent = authRes?.ok ? 'Signed in. Tap Share to generate a link.' : (authRes?.error || 'Google sign-in failed.');
     });
   }
 
