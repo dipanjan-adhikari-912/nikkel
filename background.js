@@ -162,21 +162,23 @@ async function completeUpgrade(anonToken, anonUserId, tabIdOverride) {
   } catch (e) {
     console.warn('[BG] Failed to transfer project ownership', e.message);
   }
-  try {
-    const anonReview = await shareService.ensureProjectReview(ts.project.id, anonUserId, anonToken);
-    console.log('[BG] completeUpgrade — anonReview:', { found: !!anonReview, id: anonReview?.id, owner_id: anonReview?.owner_id });
-    if (anonReview) {
-      console.log('[BG] completeUpgrade — PATCH review owner_id from', anonReview.owner_id, 'to', globalState.user.id, 'using anonToken sub:', jwtSub(anonToken));
-      await supabaseClient.request(`/rest/v1/reviews?id=eq.${anonReview.id}`, {
-        method: 'PATCH', token: anonToken,
-        body: JSON.stringify({ owner_id: globalState.user.id }),
-      });
-      ts.review = anonReview;
-      ts.review.owner_id = globalState.user.id;
-      console.log('[BG] completeUpgrade — review ownership transferred');
+  const anonReview = await shareService.ensureProjectReview(ts.project.id, anonUserId, anonToken);
+  console.log('[BG] completeUpgrade — anonReview:', { found: !!anonReview, id: anonReview?.id, owner_id: anonReview?.owner_id });
+  if (anonReview) {
+    console.log('[BG] completeUpgrade — transfer ownership via API, reviewId:', anonReview.id, 'newOwnerId:', globalState.user.id);
+    const apiRes = await fetch(`${API_URL}/api/reviews/${anonReview.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${anonToken}` },
+      body: JSON.stringify({ newOwnerId: globalState.user.id }),
+    });
+    if (!apiRes.ok) {
+      const apiErr = await apiRes.text();
+      console.warn('[BG] completeUpgrade — API transfer failed', apiRes.status, apiErr);
+      return null;
     }
-  } catch (e) {
-    console.warn('[BG] Failed to transfer review ownership', e.message);
+    ts.review = anonReview;
+    ts.review.owner_id = globalState.user.id;
+    console.log('[BG] completeUpgrade — review ownership transferred');
   }
   let review = await shareService.ensureProjectReview(ts.project.id, globalState.user?.id, globalState.token);
   if (!review) return null;
@@ -394,7 +396,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'SIGN_IN_GOOGLE': {
         console.log('[BG] SIGN_IN_GOOGLE — isAnonymous:', globalState.isAnonymous, 'anon user.id:', globalState.user?.id, 'anon email:', globalState.user?.email, 'anon JWT sub:', jwtSub(globalState.token));
         const redirectUrl = chrome.identity.getRedirectURL();
-        const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
+        const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
         let redirect;
         try {
           redirect = await chrome.identity.launchWebAuthFlow({ url: oauthUrl, interactive: true });
