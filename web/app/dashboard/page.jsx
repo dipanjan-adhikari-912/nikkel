@@ -354,7 +354,7 @@ function ProjectCard({ project, onCopyShare, onDelete, deleting, unreadCount }) 
           {pages.map((page, i) => (
             <a
               key={i}
-              href={page.pageUrl}
+              href={`/review/${project.share_token}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
