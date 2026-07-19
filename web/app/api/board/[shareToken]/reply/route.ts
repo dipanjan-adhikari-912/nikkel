@@ -43,19 +43,13 @@ export async function POST(request: NextRequest, { params }: { params: { shareTo
       .single()
 
     const isOwner = project?.owner_id === auth.user.id
-    let isCollaborator = false
     if (!isOwner) {
-      const { data: collab } = await db
+      await db
         .from('project_collaborators')
-        .select('user_id')
-        .eq('project_id', review.project_id)
-        .eq('user_id', auth.user.id)
-        .maybeSingle()
-      isCollaborator = !!collab
-    }
-
-    if (!isOwner && !isCollaborator) {
-      return NextResponse.json({ error: 'not_a_collaborator', projectId: review.project_id }, { status: 403 })
+        .upsert(
+          { project_id: review.project_id, user_id: auth.user.id, role: 'collaborator' },
+          { onConflict: 'project_id,user_id', ignoreDuplicates: true }
+        )
     }
 
     const { data, error } = await db

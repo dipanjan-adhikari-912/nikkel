@@ -25,6 +25,21 @@ function getTabState(tabId) {
   return tabState.get(tabId);
 }
 
+async function ensureCollaborator(projectId) {
+  if (!globalState.token || !globalState.user?.id) return false;
+  try {
+    await supabaseClient.request('/rest/v1/project_collaborators', {
+      method: 'POST', token: globalState.token,
+      prefer: 'resolution=ignore-duplicates,return=minimal',
+      body: JSON.stringify({ project_id: projectId, user_id: globalState.user.id, role: 'collaborator' }),
+    });
+    return true;
+  } catch (e) {
+    console.warn('[Nikkel] ensureCollaborator failed:', e.message);
+    return false;
+  }
+}
+
 function setSignedOut() {
   globalState.user = null;
   globalState.token = null;
@@ -223,7 +238,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
         if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
-        if (tab.readOnly) return { ok: false, error: 'You need to join this project before dropping pins.' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to drop pins.' };
+        const isOwner = globalState.user?.id && tab.project.owner_id === globalState.user.id;
+        if (!isOwner) {
+          const claimed = await ensureCollaborator(tab.project.id);
+          if (!claimed) return { ok: false, error: 'Could not verify project access. Try again.' };
+        }
         try {
           const pCheck = await supabaseClient.request(`/rest/v1/projects?id=eq.${tab.project.id}&select=id`, { token: globalState.token });
           if (!pCheck || (Array.isArray(pCheck) && pCheck.length === 0)) throw new Error('gone');
@@ -290,6 +310,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'SUBMIT_COMMENT': {
         const { nikkelId, text } = msg.payload || {};
         if (!nikkelId || !text) return { ok: false, error: 'Missing nikkelId or text' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to reply.' };
+        let projectId;
+        try {
+          const nikkelRow = await supabaseClient.request(`/rest/v1/nikkels?id=eq.${nikkelId}&select=review_id`, { token: globalState.token });
+          const reviewId = nikkelRow?.[0]?.review_id;
+          const reviewRow = await supabaseClient.request(`/rest/v1/reviews?id=eq.${reviewId}&select=project_id`, { token: globalState.token });
+          projectId = reviewRow?.[0]?.project_id;
+        } catch (e) {
+          return { ok: false, error: 'Could not resolve project for this comment.' };
+        }
+        if (!projectId) return { ok: false, error: 'Could not resolve project for this comment.' };
+        const isOwner = globalState.user?.id && globalState.lastProject?.projectId === projectId;
+        if (!isOwner) {
+          const claimed = await ensureCollaborator(projectId);
+          if (!claimed) return { ok: false, error: 'Could not verify project access. Try again.' };
+        }
         try {
           const authorName = globalState.user?.name || 'Anonymous';
           const supabaseRes = await fetch(`${SUPABASE_URL}/rest/v1/replies`, {
@@ -472,24 +508,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const existing = tabs.find(t => t.url && t.url.replace(/\/+$/, '') === normalized && !t.url.startsWith('chrome-extension://'));
 
         const isOwner = globalState.user?.id && project.owner_id === globalState.user.id;
-        let isCollab = false;
-        if (!isOwner && globalState.user?.id) {
-          try {
-            const collabCheck = await supabaseClient.request(`/rest/v1/project_collaborators?project_id=eq.${project.id}&user_id=eq.${globalState.user.id}&select=user_id`, { token: globalState.token });
-            isCollab = Array.isArray(collabCheck) && collabCheck.length > 0;
-            if (!isCollab) {
-              await supabaseClient.request('/rest/v1/project_collaborators', {
-                method: 'POST', token: globalState.token,
-                prefer: 'return=minimal',
-                body: JSON.stringify({ project_id: project.id, user_id: globalState.user.id, role: 'collaborator' }),
-              });
-              isCollab = true;
-            }
-          } catch (e) {
-            console.warn('[Nikkel] Auto-claim collaborator seat failed:', e.message);
-          }
-        }
-        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !(isOwner || isCollab) };
+        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !(globalState.token && globalState.user?.email) };
 
         let tab;
         let reused = false;
