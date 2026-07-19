@@ -308,6 +308,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
       }
 
+      case 'GET_TOKEN': {
+        return { ok: true, token: globalState.token || '' };
+      }
+
       case 'SIGN_IN_GOOGLE': {
         const redirectUrl = chrome.identity.getRedirectURL();
         const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
