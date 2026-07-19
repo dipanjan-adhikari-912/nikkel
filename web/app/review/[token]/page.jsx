@@ -39,6 +39,8 @@ export default function ReviewPage({ params }) {
   useEffect(() => {
     const t = getToken()
     if (t) { setToken(t); return }
+    const dt = document.documentElement.dataset.nikkelToken
+    if (dt) { setToken(dt); return }
     supabaseClient.auth.getSession().then(({ data }) => {
       if (data?.session?.access_token) setToken(data.session.access_token)
     })
@@ -55,7 +57,8 @@ export default function ReviewPage({ params }) {
     function handler(event) {
       if (event.data?.source === 'nikkel-extension') {
         setExtensionDetected(true)
-        if (event.data?.token) setToken(event.data.token)
+        const t = event.data?.token || document.documentElement.dataset.nikkelToken
+        if (t) setToken(t)
       }
     }
     window.addEventListener('message', handler)

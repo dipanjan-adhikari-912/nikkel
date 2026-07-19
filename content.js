@@ -1169,6 +1169,8 @@ window.addEventListener('message', (event) => {
 });
 console.log('[Nikkel] listener registered');
 chrome.runtime.sendMessage({ type: 'GET_TOKEN' }, (res) => {
-  window.postMessage({ type: 'NIKKEL_EXTENSION_READY', source: 'nikkel-extension', token: res?.token || '' }, '*');
+  const token = res?.token || '';
+  if (token) document.documentElement.dataset.nikkelToken = token;
+  window.postMessage({ type: 'NIKKEL_EXTENSION_READY', source: 'nikkel-extension', token }, '*');
 });
 })();
