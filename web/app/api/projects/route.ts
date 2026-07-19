@@ -26,31 +26,46 @@ export async function GET(request: NextRequest) {
     ...(collabRows || []).map(r => ({ ...r.projects, role: 'collaborator' }))
   ]
 
-  const enriched = await Promise.all(all.map(async (p) => {
-    const { data: reviews } = await db.from('reviews').select('id').eq('project_id', p.id)
-    const reviewIds = (reviews || []).map((r: any) => r.id)
-    let nikkelCount = 0
-    let lastActivityAt = p.created_at
-    const pageBreakdown: { pageUrl: string; nikkelCount: number }[] = []
-    if (reviewIds.length > 0) {
-      const { data: nikkels } = await db
-        .from('nikkels')
-        .select('created_at, page_url')
-        .in('review_id', reviewIds)
-        .order('created_at', { ascending: false })
-      nikkelCount = nikkels?.length || 0
-      if (nikkels?.[0]?.created_at) lastActivityAt = nikkels[0].created_at
-      const pageMap: Record<string, number> = {}
-      for (const n of nikkels || []) {
-        const key = n.page_url || 'unknown'
-        pageMap[key] = (pageMap[key] || 0) + 1
-      }
-      for (const [pageUrl, count] of Object.entries(pageMap)) {
-        pageBreakdown.push({ pageUrl, nikkelCount: count })
-      }
+  // Batch all nikkels in one query (was N+1 per project)
+  const projectIds = all.map((p: any) => p.id)
+  const { data: reviews } = await db
+    .from('reviews')
+    .select('id, project_id')
+    .in('project_id', projectIds)
+  const reviewIds = (reviews || []).map((r: any) => r.id)
+  const reviewProjectMap: Record<string, string> = {}
+  for (const r of reviews || []) { reviewProjectMap[r.id] = r.project_id }
+
+  let allNikkels: any[] = []
+  if (reviewIds.length > 0) {
+    const { data: n } = await db
+      .from('nikkels')
+      .select('created_at, page_url, review_id')
+      .in('review_id', reviewIds)
+      .order('created_at', { ascending: false })
+    allNikkels = n || []
+  }
+
+  const projectData: Record<string, { nikkels: any[] }> = {}
+  for (const n of allNikkels) {
+    const pid = reviewProjectMap[n.review_id]
+    if (!pid) continue
+    if (!projectData[pid]) projectData[pid] = { nikkels: [] }
+    projectData[pid].nikkels.push(n)
+  }
+
+  const enriched = all.map((p: any) => {
+    const data = projectData[p.id] || { nikkels: [] }
+    const nikkelCount = data.nikkels.length
+    const lastActivityAt = data.nikkels[0]?.created_at || p.created_at
+    const pageMap: Record<string, number> = {}
+    for (const n of data.nikkels) {
+      const key = n.page_url || 'unknown'
+      pageMap[key] = (pageMap[key] || 0) + 1
     }
+    const pageBreakdown = Object.entries(pageMap).map(([pageUrl, count]) => ({ pageUrl, nikkelCount: count }))
     return { ...p, nikkelCount, lastActivityAt, pageBreakdown }
-  }))
+  })
 
   return NextResponse.json(enriched)
 }

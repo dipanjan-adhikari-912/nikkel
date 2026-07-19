@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="#334155" width="40" height="40" rx="20"/><text x="20" y="26" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif">?</text></svg>')
 
@@ -34,6 +34,27 @@ export default function DashboardPage() {
   const [newTitle, setNewTitle] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [nav, setNav] = useState('home')
+  const [loading, setLoading] = useState(true)
+  const intervalRef = useRef(null)
+
+  const fetchData = useCallback(async (t) => {
+    if (!t) return
+    try {
+      const [u, p] = await Promise.all([
+        api(t, '/auth/me'),
+        api(t, '/projects'),
+      ])
+      setUser(u)
+      setProjects(p)
+    } catch (e) {
+      if (e.message?.includes('(401)')) {
+        setToken(null)
+        try { sessionStorage.removeItem('nikkel_token') } catch {}
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const t = getToken()
@@ -42,11 +63,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!token) return
-    api(token, '/auth/me').then(setUser).catch((e) => {
-      if (e.message?.includes('(401)')) { setToken(null); try { sessionStorage.removeItem('nikkel_token') } catch {} }
-    })
-    api(token, '/projects').then(setProjects).catch(() => {})
-  }, [token])
+    setLoading(true)
+    fetchData(token)
+    // Refresh every 60s
+    intervalRef.current = setInterval(() => fetchData(token), 60000)
+    // Refresh when tab becomes visible
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchData(token) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(intervalRef.current)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [token, fetchData])
 
   const createProject = useCallback(async () => {
     if (!newTitle.trim() || !newUrl.trim()) return
@@ -139,16 +167,27 @@ export default function DashboardPage() {
 
         {/* Project grid */}
         {nav === 'home' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-            {projects.map(p => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                onCopyShare={() => copyShareLink(p.share_token)}
-                onDelete={() => deleteProject(p.id)}
-              />
-            ))}
-          </div>
+          loading ? (
+            <div style={{ textAlign: 'center', marginTop: 80, color: '#64748b' }}>
+              <p style={{ fontSize: 15 }}>Loading...</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              {projects.map(p => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onCopyShare={() => copyShareLink(p.share_token)}
+                  onDelete={() => deleteProject(p.id)}
+                />
+              ))}
+              {projects.length === 0 && (
+                <div style={{ textAlign: 'center', padding: 40, color: '#64748b', gridColumn: '1 / -1' }}>
+                  <p style={{ fontSize: 15 }}>No projects yet. Click "+ New Project" to get started.</p>
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>
