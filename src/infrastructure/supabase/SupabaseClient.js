@@ -5,6 +5,11 @@ export class SupabaseClient {
   constructor() {
     this._token = null;
     this._refreshToken = null;
+    this._onRefresh = null;
+  }
+
+  onRefresh(cb) {
+    this._onRefresh = cb;
   }
 
   setTokens(accessToken, refreshToken) {
@@ -42,6 +47,7 @@ export class SupabaseClient {
           const refreshData = await refreshRes.json();
           this._token = refreshData.access_token;
           this._refreshToken = refreshData.refresh_token || this._refreshToken;
+          if (this._onRefresh) this._onRefresh(this._token, this._refreshToken);
           headers['Authorization'] = `Bearer ${this._token}`;
           const retry = await fetch(`${SUPABASE_URL}${path}`, { ...fetchOptions, headers });
           if (!retry.ok) {

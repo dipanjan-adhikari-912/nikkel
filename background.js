@@ -4,6 +4,11 @@ import { SUPABASE_URL, SUPABASE_ANON } from './src/infrastructure/supabase/Supab
 
 const { supabaseClient, authService, projectService, pinService, shareService } = container;
 
+supabaseClient.onRefresh((token, refreshToken) => {
+  syncTokens(token, refreshToken);
+  saveState();
+});
+
 function jwtSub(token) {
   try {
     const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -192,8 +197,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const ts = tabId ? getTabState(tabId) : null;
 
     switch (msg.type) {
-      case 'GET_STATE':
-        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token: globalState.token || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` };
+      case 'GET_STATE': {
+        let token = globalState.token || '';
+        if (globalState.refreshToken) {
+          try {
+            const { access_token, refresh_token } = await supabaseClient.authRefresh();
+            if (access_token) {
+              token = access_token;
+              supabaseClient.setTokens(access_token, refresh_token || globalState.refreshToken);
+              syncTokens(access_token, refresh_token || globalState.refreshToken);
+              await saveState();
+            }
+          } catch {}
+        }
+        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(token)}` };
+      }
 
       case 'START_REVIEW': {
         if (globalState.globalDisabled) return { ok: false, error: 'Nikkel is disabled' };
