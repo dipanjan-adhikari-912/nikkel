@@ -232,9 +232,8 @@ $('signOutLink').addEventListener('click', async () => {
 $('dashboardLink').addEventListener('click', async () => {
   const tab = await getActiveTab();
   const state = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
-  const token = state?.token || '';
-  const sep = token ? `#token=${encodeURIComponent(token)}` : '';
-  chrome.tabs.create({ url: `https://nikkel-alpha.vercel.app/dashboard${sep}` });
+  const url = state?.dashboardUrl || `https://nikkel-alpha.vercel.app/dashboard`;
+  chrome.tabs.create({ url });
 });
 
 $('settingsLink').addEventListener('click', () => {

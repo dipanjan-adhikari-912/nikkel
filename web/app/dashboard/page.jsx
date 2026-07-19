@@ -71,7 +71,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const t = getToken()
-    if (t) setToken(t)
+    if (t) { setToken(t); return }
+
+    function handler(event) {
+      if (event.data?.source === 'nikkel-extension' && event.data?.token) {
+        setToken(event.data.token)
+        try { sessionStorage.setItem('nikkel_token', event.data.token) } catch {}
+      }
+    }
+    window.addEventListener('message', handler)
+
+    const interval = setInterval(() => {
+      const dt = document.documentElement.dataset.nikkelToken
+      if (dt) { setToken(dt); try { sessionStorage.setItem('nikkel_token', dt) } catch {}; clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
+    }, 300)
+
+    window.postMessage({ type: 'NIKKEL_PING' }, '*')
+    const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
+    return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
   }, [])
 
   useEffect(() => {
