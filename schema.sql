@@ -217,10 +217,13 @@ create table project_read_state (
 
 alter table project_read_state enable row level security;
 
-create policy "users_manage_own_read_state"
-  on project_read_state for all
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+do $$ begin
+  create policy "users_manage_own_read_state"
+    on project_read_state for all
+    using (user_id = auth.uid())
+    with check (user_id = auth.uid());
+exception when duplicate_object then null;
+end $$;
 
 create or replace function get_unread_counts(uid uuid)
 returns jsonb
@@ -242,7 +245,7 @@ begin
   ),
   unread_events as (
     -- New nikkels since last read (includes own)
-    select pid from project_ids p
+    select p.id as pid from project_ids p
     join reviews rv on rv.project_id = p.id
     join nikkels n on n.review_id = rv.id
     left join read_states rs on rs.project_id = p.id
@@ -251,7 +254,7 @@ begin
     union all
 
     -- New replies since last read (includes own)
-    select pid from project_ids p
+    select p.id as pid from project_ids p
     join reviews rv on rv.project_id = p.id
     join nikkels n on n.review_id = rv.id
     join replies r on r.nikkel_id = n.id
