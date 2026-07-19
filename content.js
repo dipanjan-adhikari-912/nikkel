@@ -951,7 +951,7 @@ async function handleDocumentClick(e) {
 }
 
 function handleKeydown(e) {
-  if ((e.key === '`' || e.key === 'Backquote') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+  if (e.key === '`' || e.key === 'Backquote' || e.key === '´') {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
     if (currentMode !== 'annotate' && currentMode !== 'browse') return;
     const newMode = currentMode === 'annotate' ? 'browse' : 'annotate';
