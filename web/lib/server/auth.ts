@@ -3,7 +3,7 @@ import { db } from './supabase'
 
 // Lightweight auth: decode JWT locally, skip Supabase Auth API round-trip.
 // The JWT was already verified by Supabase client before being sent to us.
-function decodeToken(token: string): { sub?: string } | null {
+function decodeToken(token: string): Record<string, any> | null {
   try {
     const payload = token.split('.')[1]
     if (!payload) return null
@@ -34,7 +34,7 @@ export async function requireAuth(request: Request) {
     .eq('id', payload.sub)
     .single()
 
-  return { user: { id: payload.sub }, profile }
+  return { user: { id: payload.sub, email: payload.email || '', is_anonymous: !!payload.is_anonymous }, profile }
 }
 
 // Even lighter: just verify token, skip profile fetch entirely
@@ -46,5 +46,5 @@ export async function requireAuthOnly(request: Request) {
   if (!payload) return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) }
   if (!payload.sub) return { error: NextResponse.json({ error: 'Invalid token payload' }, { status: 401 }) }
 
-  return { user: { id: payload.sub } }
+  return { user: { id: payload.sub, email: payload.email || '', is_anonymous: !!payload.is_anonymous } }
 }
