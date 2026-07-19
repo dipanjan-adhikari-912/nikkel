@@ -5,7 +5,11 @@ import { SUPABASE_URL, SUPABASE_ANON } from './src/infrastructure/supabase/Supab
 const { supabaseClient, authService, projectService, pinService, shareService } = container;
 
 function jwtSub(token) {
-  try { return JSON.parse(atob(token.split('.')[1])).sub; } catch { return null; }
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, '=');
+    return JSON.parse(atob(padded)).sub;
+  } catch { return null; }
 }
 
 const globalState = {
