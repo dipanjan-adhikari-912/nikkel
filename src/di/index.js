@@ -1,6 +1,6 @@
 import { SupabaseClient } from '../infrastructure/supabase/SupabaseClient.js';
 import { SupabaseProjectRepository, SupabasePinRepository, SupabaseUserRepository } from '../repositories/index.js';
-import { AuthService, ProjectService, PinService, ShareService, ReviewService } from '../services/index.js';
+import { AuthService, ProjectService, PinService, ShareService } from '../services/index.js';
 
 class Container {
   constructor() {
@@ -12,7 +12,8 @@ class Container {
     this.projectService = new ProjectService(this.projectRepository);
     this.pinService = new PinService(this.pinRepository);
     this.shareService = new ShareService(this.supabaseClient, this.projectRepository);
-    this.reviewService = new ReviewService();
+
+
   }
 }
 

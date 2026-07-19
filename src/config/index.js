@@ -18,4 +18,4 @@ const cfg = self.__NIKKEL_CONFIG || {};
 export const VIEWER_BASE = must('VIEWER_BASE', cfg.VIEWER_BASE || VIEWER);
 export const API_URL = must('API_URL', cfg.API_URL || API);
 export const CHROME_STORE_URL = (cfg.CHROME_STORE_URL || '').replace(/\/+$/, '');
-export { features } from './features.js';
+
