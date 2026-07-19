@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/server/supabase'
-import { requireAuthOnly } from '@/lib/server/auth'
+import { requireAuth, requireAuthOnly } from '@/lib/server/auth'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireAuth(request)
