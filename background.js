@@ -439,36 +439,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, globalDisabled: globalState.globalDisabled };
       }
 
-      case 'RESUME_PROJECT': {
-        const resumeTabId = sender.tab?.id || tabId;
-        if (!resumeTabId) return { ok: false, error: 'No tab context' };
-        const projectId = msg.payload?.projectId;
-        if (!projectId) return { ok: false, error: 'No projectId provided' };
-        if (!globalState.token) return { ok: false, error: 'Not authenticated' };
-        try {
-          const projectRows = await supabaseClient.request(`/rest/v1/projects?id=eq.${projectId}&select=*`, { token: globalState.token });
-          const project = Array.isArray(projectRows) ? projectRows[0] : null;
-          if (!project) return { ok: false, error: 'Project not found' };
-          const ts = getTabState(resumeTabId);
-          ts.project = { id: project.id, title: project.title, baseUrl: project.base_url };
-          ts.review = null;
-          ts.nikkels = [];
-          ts.mode = 'browse';
-          ts.url = ts.url || '';
-          ts.readOnly = false;
-          setLastProject(ts.project, null);
-          await saveState();
-          await sendToTab(resumeTabId, {
-            type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: null, shareUrl: '', mode: 'browse', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
-          });
-          return { ok: true };
-        } catch (e) {
-          console.warn('[BG] RESUME_PROJECT failed', e.message);
-          return { ok: false, error: e.message };
-        }
-      }
-
       case 'SIGN_OUT': {
         setSignedOut();
         globalState.lastProject = null;
@@ -557,18 +527,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
         const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
         return { ok: true, shareUrl };
-      }
-
-      case 'GET_USER_PROJECTS': {
-        if (!globalState.token || !globalState.user?.id) return { ok: true, projects: [] };
-        try {
-          const projects = await supabaseClient.request(`/rest/v1/projects?select=*&owner_id=eq.${globalState.user.id}&order=created_at.desc&limit=50`, { token: globalState.token });
-          const collabRows = await supabaseClient.request(`/rest/v1/project_collaborators?select=project_id&user_id=eq.${globalState.user.id}`, { token: globalState.token });
-          return { ok: true, projects: Array.isArray(projects) ? projects : [] };
-        } catch (e) {
-          console.warn('[BG] GET_USER_PROJECTS failed', e.message);
-          return { ok: true, projects: [] };
-        }
       }
 
       case 'GET_USER_PROFILE': {

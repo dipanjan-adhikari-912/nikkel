@@ -85,47 +85,6 @@ $('enableBtn').addEventListener('click', async () => {
 function showWelcomeView(state) {
   showView('vWelcome');
   $('resetLink').style.display = state.user ? 'block' : 'none';
-  loadSessions();
-}
-
-async function loadSessions() {
-  const list = $('sessionsList');
-  if (!list) return;
-  const tab = await getActiveTab();
-  const state = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
-  if (!state.user) { list.innerHTML = ''; return; }
-  const res = await bg({ type: 'GET_USER_PROJECTS' });
-  const projects = (res.ok && res.projects) || [];
-  if (projects.length === 0) { list.innerHTML = '<div style="color:#64748b;font-size:11px;padding:4px 0">No sessions yet</div>'; return; }
-  list.innerHTML = projects.map(p => `
-    <div class="session-item" data-id="${p.id}">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title || 'Untitled'}</div>
-        <div style="font-size:10px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(p.base_url || '').replace(/^https?:\/\//, '')}</div>
-      </div>
-      <button class="btn btn-sm resume-btn" data-id="${p.id}">Resume</button>
-    </div>
-  `).join('');
-  list.querySelectorAll('.session-item').forEach(el => {
-    el.addEventListener('mouseenter', () => { el.style.background = '#334155'; });
-    el.addEventListener('mouseleave', () => { el.style.background = '#1e293b'; });
-  });
-  list.querySelectorAll('.resume-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const pid = btn.dataset.id;
-      btn.disabled = true;
-      btn.textContent = 'Opening…';
-      const resumeRes = await bg({ type: 'RESUME_PROJECT', payload: { projectId: pid, pageUrl: tab?.url } });
-      if (resumeRes.ok) {
-        window.close();
-      } else {
-        btn.disabled = false;
-        btn.textContent = 'Resume';
-        showError(resumeRes.error || 'Failed to resume session');
-      }
-    });
-  });
 }
 
 function showShareUrl(url) {
@@ -220,7 +179,6 @@ function showActiveView(state) {
         <div class="share-msg">Sign in with Google to share this review with your name attached.</div>
       </div>`;
   }
-  loadSessions();
 }
 
 $('startReviewBtn').addEventListener('click', async () => {
