@@ -7,7 +7,13 @@ export class ShareService {
   }
 
   async ensureProjectReview(projectId, userId, token) {
-    const sub = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
+    let sub = null;
+    if (token) {
+      try {
+        const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        sub = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '='))).sub;
+      } catch { sub = null; }
+    }
     console.log('[ShareService] ensureProjectReview', { projectId, userId, tokenSub: sub });
     try {
       const existing = await this._client.request(`/rest/v1/reviews?project_id=eq.${projectId}&order=created_at.desc&limit=1`, { token });
