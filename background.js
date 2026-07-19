@@ -522,7 +522,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const existing = tabs.find(t => t.url && t.url.replace(/\/+$/, '') === normalized && !t.url.startsWith('chrome-extension://'));
 
         const isOwner = globalState.user?.id && project.owner_id === globalState.user.id;
-        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !isOwner };
+        let isCollab = false;
+        if (!isOwner && globalState.user?.id) {
+          try {
+            const collabCheck = await supabaseClient.request(`/rest/v1/project_collaborators?project_id=eq.${project.id}&user_id=eq.${globalState.user.id}&select=user_id`, { token: globalState.token });
+            isCollab = Array.isArray(collabCheck) && collabCheck.length > 0;
+          } catch {}
+        }
+        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !(isOwner || isCollab) };
 
         let tab;
         let reused = false;
