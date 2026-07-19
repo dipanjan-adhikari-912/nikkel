@@ -530,7 +530,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           stateForTab.nikkels = nikkels;
           await sendToTab(tab.id, {
             type: 'LOAD_SESSION',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: true, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: stateForTab.readOnly, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         } catch {}
         return { ok: true, targetUrl, reused };
