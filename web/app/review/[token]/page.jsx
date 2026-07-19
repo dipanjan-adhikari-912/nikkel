@@ -53,20 +53,20 @@ export default function ReviewPage({ params }) {
 
   useEffect(() => {
     function handler(event) {
-      if (event.data?.source === 'nikkel-extension') setExtensionDetected(true)
-      if (event.data?.type === 'AUTH_TOKEN' && event.data?.payload?.token) setToken(event.data.payload.token)
+      if (event.data?.source === 'nikkel-extension') {
+        setExtensionDetected(true)
+        if (event.data?.token) setToken(event.data.token)
+      }
     }
     window.addEventListener('message', handler)
     if (document.documentElement.dataset.nikkelExtension) {
       setExtensionDetected(true)
-      window.postMessage({ action: 'GET_AUTH_TOKEN' }, '*')
       return () => window.removeEventListener('message', handler)
     }
     window.postMessage({ type: 'PING' }, '*')
     const interval = setInterval(() => {
       if (document.documentElement.dataset.nikkelExtension) {
         setExtensionDetected(true)
-        window.postMessage({ action: 'GET_AUTH_TOKEN' }, '*')
         clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler); return
       }
       window.postMessage({ type: 'PING' }, '*')

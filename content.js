@@ -1149,12 +1149,6 @@ window.addEventListener('message', (event) => {
       }
     }
   }
-  if (event.data?.action === 'GET_AUTH_TOKEN') {
-    chrome.runtime.sendMessage({ type: 'GET_TOKEN' }, (res) => {
-      window.postMessage({ type: 'AUTH_TOKEN', payload: { token: res?.token || '' } }, '*');
-    });
-    return;
-  }
   if (event.data?.action === 'LOAD_REVIEW') {
     if (!isValid()) return;
     try {
@@ -1174,5 +1168,7 @@ window.addEventListener('message', (event) => {
   }
 });
 console.log('[Nikkel] listener registered');
-window.postMessage({ type: 'NIKKEL_EXTENSION_READY', source: 'nikkel-extension' }, '*');
+chrome.runtime.sendMessage({ type: 'GET_TOKEN' }, (res) => {
+  window.postMessage({ type: 'NIKKEL_EXTENSION_READY', source: 'nikkel-extension', token: res?.token || '' }, '*');
+});
 })();
