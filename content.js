@@ -341,6 +341,13 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
 
   if (projectNameEl) projectNameEl.textContent = projectName || '';
   if (dashboardLink && dashboardUrl) { dashboardLink.href = dashboardUrl; }
+  if (dashboardLink) {
+    dashboardLink.addEventListener('click', (e) => {
+      chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
+        if (res?.dashboardUrl) dashboardLink.href = res.dashboardUrl;
+      });
+    });
+  }
   if (shareUrl && shareUrlTxt) {
     shareUrlTxt.value = shareUrl;
     if (shareMeta) shareMeta.textContent = projectName ? `Session: ${projectName}` : '';
