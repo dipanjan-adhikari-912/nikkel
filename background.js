@@ -246,6 +246,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           elementText: d.elementText,
           comment: d.comment,
           idx: nextIdx,
+          userId: globalState.user?.id,
         }, globalState.token);
         tab.nikkels.push(saved);
         await saveState();

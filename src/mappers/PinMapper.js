@@ -35,6 +35,7 @@ export class PinMapper {
       idx: pin.idx,
     };
     if (pin.id != null) obj.id = pin.id;
+    if (pin.userId) obj.owner_id = pin.userId;
     return obj;
   }
 }
