@@ -35,6 +35,8 @@ export default function DashboardPage() {
   const [newUrl, setNewUrl] = useState('')
   const [nav, setNav] = useState('home')
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
+  const [toast, setToast] = useState(null)
   const intervalRef = useRef(null)
 
   const fetchData = useCallback(async (t) => {
@@ -90,12 +92,24 @@ export default function DashboardPage() {
   }, [token, newTitle, newUrl])
 
   const deleteProject = useCallback(async (id) => {
+    setDeletingId(id)
     try {
       await api(token, `/projects/${id}`, { method: 'DELETE' })
       const updated = await api(token, '/projects')
       setProjects(updated)
-    } catch {}
+      setToast('Project deleted')
+    } catch {
+      setToast('Failed to delete project')
+    } finally {
+      setDeletingId(null)
+    }
   }, [token])
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(id)
+  }, [toast])
 
   function copyShareLink(shareToken) {
     navigator.clipboard.writeText(`${window.location.origin}/review/${shareToken}`)
@@ -165,6 +179,13 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Toast */}
+        {toast && (
+          <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '10px 20px', background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#e2e8f0', fontSize: 14, zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+            {toast}
+          </div>
+        )}
+
         {/* Project grid */}
         {nav === 'home' && (
           loading ? (
@@ -177,6 +198,7 @@ export default function DashboardPage() {
                 <ProjectCard
                   key={p.id}
                   project={p}
+                  deleting={deletingId === p.id}
                   onCopyShare={() => copyShareLink(p.share_token)}
                   onDelete={() => deleteProject(p.id)}
                 />
@@ -264,7 +286,7 @@ function relativePath(pageUrl, baseUrl) {
   } catch { return pageUrl }
 }
 
-function ProjectCard({ project, onCopyShare, onDelete }) {
+function ProjectCard({ project, onCopyShare, onDelete, deleting }) {
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
   const isOwner = project.role !== 'collaborator'
@@ -327,12 +349,14 @@ function ProjectCard({ project, onCopyShare, onDelete }) {
         <span style={{ fontSize: 11, color: '#475569' }}>
           {project.lastActivityAt ? new Date(project.lastActivityAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
         </span>
-        {isOwner && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={onCopyShare} style={{ padding: '4px 10px', border: '1px solid #334155', borderRadius: 4, background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 11 }}>Copy link</button>
-            <button onClick={onDelete} style={{ padding: '4px 10px', border: '1px solid #7f1d1d', borderRadius: 4, background: 'transparent', color: '#fca5a5', cursor: 'pointer', fontSize: 11 }}>Delete</button>
-          </div>
-        )}
+          {isOwner && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={onCopyShare} style={{ padding: '4px 10px', border: '1px solid #334155', borderRadius: 4, background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 11 }}>Copy link</button>
+              <button onClick={onDelete} disabled={deleting} style={{ padding: '4px 10px', border: '1px solid #7f1d1d', borderRadius: 4, background: deleting ? '#7f1d1d' : 'transparent', color: deleting ? '#fef2f2' : '#fca5a5', cursor: deleting ? 'wait' : 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          )}
       </div>
     </div>
   )
