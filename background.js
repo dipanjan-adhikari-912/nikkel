@@ -311,20 +311,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const { nikkelId, text } = msg.payload || {};
         if (!nikkelId || !text) return { ok: false, error: 'Missing nikkelId or text' };
         if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to reply.' };
-        let projectId;
-        try {
-          const nikkelRow = await supabaseClient.request(`/rest/v1/nikkels?id=eq.${nikkelId}&select=review_id`, { token: globalState.token });
-          const reviewId = nikkelRow?.[0]?.review_id;
-          const reviewRow = await supabaseClient.request(`/rest/v1/reviews?id=eq.${reviewId}&select=project_id`, { token: globalState.token });
-          projectId = reviewRow?.[0]?.project_id;
-        } catch (e) {
-          return { ok: false, error: 'Could not resolve project for this comment.' };
-        }
-        if (!projectId) return { ok: false, error: 'Could not resolve project for this comment.' };
-        const isOwner = globalState.user?.id && globalState.lastProject?.projectId === projectId;
-        if (!isOwner) {
-          const claimed = await ensureCollaborator(projectId);
-          if (!claimed) return { ok: false, error: 'Could not verify project access. Try again.' };
+        const srcTabId = sender.tab?.id;
+        const tab = srcTabId ? getTabState(srcTabId) : null;
+        if (tab?.project?.id) {
+          const isOwner = globalState.user?.id && tab.project.owner_id === globalState.user.id;
+          if (!isOwner) {
+            const claimed = await ensureCollaborator(tab.project.id);
+            if (!claimed) return { ok: false, error: 'Could not verify project access. Try again.' };
+          }
         }
         try {
           const authorName = globalState.user?.name || 'Anonymous';
