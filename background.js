@@ -363,6 +363,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
 
       case 'GET_TOKEN': {
+        if (globalState.refreshToken) {
+          try {
+            const { access_token, refresh_token } = await supabaseClient.authRefresh();
+            if (access_token) {
+              supabaseClient.setTokens(access_token, refresh_token || globalState.refreshToken);
+              syncTokens(access_token, refresh_token || globalState.refreshToken);
+              saveState();
+              return { ok: true, token: access_token };
+            }
+          } catch {}
+        }
         return { ok: true, token: globalState.token || '' };
       }
 
