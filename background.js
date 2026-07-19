@@ -475,6 +475,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           try {
             const collabCheck = await supabaseClient.request(`/rest/v1/project_collaborators?project_id=eq.${project.id}&user_id=eq.${globalState.user.id}&select=user_id`, { token: globalState.token });
             isCollab = Array.isArray(collabCheck) && collabCheck.length > 0;
+            if (!isCollab) {
+              await supabaseClient.request('/rest/v1/project_collaborators', {
+                method: 'POST', token: globalState.token,
+                prefer: 'return=minimal',
+                body: JSON.stringify({ project_id: project.id, user_id: globalState.user.id, role: 'collaborator' }),
+              });
+              isCollab = true;
+            }
           } catch {}
         }
         const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !(isOwner || isCollab) };
