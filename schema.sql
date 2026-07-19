@@ -213,10 +213,24 @@ returns jsonb
 language plpgsql
 security definer
 as $$
+declare
+  _review_ids uuid[];
+  _nikkel_ids uuid[];
 begin
   if not exists (select 1 from projects where id = pid and owner_id = uid) then
     return jsonb_build_object('error', 'Not found or not authorized');
   end if;
+  -- Bulk delete bottom-up (much faster than relying on ON DELETE CASCADE triggers)
+  select array_agg(id) into _review_ids from reviews where project_id = pid;
+  if _review_ids is not null then
+    select array_agg(id) into _nikkel_ids from nikkels where review_id = any(_review_ids);
+    if _nikkel_ids is not null then
+      delete from replies where nikkel_id = any(_nikkel_ids);
+    end if;
+    delete from nikkels where review_id = any(_review_ids);
+    delete from reviews where project_id = pid;
+  end if;
+  delete from project_collaborators where project_id = pid;
   delete from projects where id = pid;
   return jsonb_build_object('message', 'Project deleted');
 end;

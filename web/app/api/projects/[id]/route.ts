@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/server/supabase'
-import { requireAuth } from '@/lib/server/auth'
+import { requireAuthOnly } from '@/lib/server/auth'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireAuth(request)
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await requireAuth(request)
+  const auth = await requireAuthOnly(request)
   if ('error' in auth) return auth.error
 
   const { data, error } = await db.rpc('delete_project', { pid: params.id, uid: auth.user.id })
