@@ -240,22 +240,34 @@ begin
     from project_read_state
     where user_id = uid
   ),
-  unread as (
-    select
-      p.id as pid,
-      count(*)::int as cnt
-    from project_ids p
+  unread_events as (
+    -- New nikkels (pins/comments) by other users
+    select pid from project_ids p
+    join reviews rv on rv.project_id = p.id
+    join nikkels n on n.review_id = rv.id
+    left join read_states rs on rs.project_id = p.id
+    where (rs.last_read_at is null or n.created_at > rs.last_read_at)
+      and (n.owner_id is null or n.owner_id != uid)
+
+    union all
+
+    -- New replies by other users
+    select pid from project_ids p
     join reviews rv on rv.project_id = p.id
     join nikkels n on n.review_id = rv.id
     join replies r on r.nikkel_id = n.id
     left join read_states rs on rs.project_id = p.id
     where (rs.last_read_at is null or r.created_at > rs.last_read_at)
       and (r.user_id is null or r.user_id != uid)
-    group by p.id
   )
   select jsonb_build_object(
-    'total', coalesce((select sum(cnt) from unread), 0),
-    'byProject', coalesce((select jsonb_object_agg(pid::text, cnt) from unread), '{}'::jsonb)
+    'total', (select count(*) from unread_events),
+    'byProject', coalesce(
+      (select jsonb_object_agg(pid::text, cnt::int) from (
+        select pid, count(*) as cnt from unread_events group by pid
+      ) x),
+      '{}'::jsonb
+    )
   ) into result;
   return result;
 end;
