@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Nikkel",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnLm4NYNuFKROjmWYUb9iPcK/N5Wm6kJH0vJDoriVh8knj/fVilkYAmHB4R4eGgDk25OALOVRNfDNdSblK54XZZJQ4FHphhsSTHlnr3+hTkOEQyGmJS8Vtnlh50qFvXSkYgM356zJaXWZ7noCO0nIYYFhMYoxWOCBA8FwzlqTM3WanoqVsDvjnWe19OP0PEQBIyk2GSvcsH6I8xjVskqBGbTtyRaqhSzK6/jJrfTRd13cVC7ROAfaSQK/o+UyF3UwR7IZXIEudtDaBl4i3evKPW5cSoL6+GF3GWx7rl8PjtjyCiJ8rn1xS1LglxbSPWld65P090W6wa2tkvHJP36plwIDAQAB",
   "description": "Drop annotation pins on any webpage. Share sessions with your team.",
   "permissions": ["activeTab", "storage", "scripting", "tabs", "clipboardWrite", "identity"],
   "host_permissions": ["<all_urls>"],
