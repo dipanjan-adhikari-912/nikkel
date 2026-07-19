@@ -206,3 +206,18 @@ create policy "Authors can update own replies"
 
 create index if not exists replies_nikkel_id_idx on replies (nikkel_id);
 create index if not exists replies_created_at_idx on replies (nikkel_id, created_at);
+
+-- RPC: delete a project and all children in one transaction (avoid slow multi-round-trip deletes)
+create or replace function delete_project(pid uuid, uid uuid)
+returns jsonb
+language plpgsql
+security definer
+as $$
+begin
+  if not exists (select 1 from projects where id = pid and owner_id = uid) then
+    return jsonb_build_object('error', 'Not found or not authorized');
+  end if;
+  delete from projects where id = pid;
+  return jsonb_build_object('message', 'Project deleted');
+end;
+$$;
