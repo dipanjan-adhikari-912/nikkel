@@ -37,6 +37,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
   const [toast, setToast] = useState(null)
+  const [unread, setUnread] = useState({})
+  const [lastRefreshed, setLastRefreshed] = useState(null)
   const intervalRef = useRef(null)
 
   const fetchData = useCallback(async (t) => {
@@ -58,6 +60,15 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const pollUnread = useCallback(async (t) => {
+    if (!t) return
+    try {
+      const res = await api(t, '/projects/unread')
+      setUnread(res.byProject || {})
+      setLastRefreshed(new Date())
+    } catch {}
+  }, [])
+
   useEffect(() => {
     const t = getToken()
     if (t) setToken(t)
@@ -67,16 +78,20 @@ export default function DashboardPage() {
     if (!token) return
     setLoading(true)
     fetchData(token)
+    pollUnread(token)
     // Refresh every 60s
-    intervalRef.current = setInterval(() => fetchData(token), 60000)
+    intervalRef.current = setInterval(() => {
+      fetchData(token)
+      pollUnread(token)
+    }, 60000)
     // Refresh when tab becomes visible
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchData(token) }
+    const onVisible = () => { if (document.visibilityState === 'visible') { fetchData(token); pollUnread(token) } }
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       clearInterval(intervalRef.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [token, fetchData])
+  }, [token, fetchData, pollUnread])
 
   const createProject = useCallback(async () => {
     if (!newTitle.trim() || !newUrl.trim()) return
@@ -157,6 +172,14 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Refresh row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, fontSize: 12, color: '#64748b' }}>
+          <button onClick={() => { fetchData(token); pollUnread(token) }} style={{ padding: '4px 12px', background: '#1e293b', border: '1px solid #334155', borderRadius: 4, color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>
+            Refresh
+          </button>
+          <span>Last refreshed: {lastRefreshed ? lastRefreshed.toLocaleString() : '—'}</span>
+        </div>
+
         {/* New project form */}
         {showNew && (
           <div style={{ marginBottom: 24, padding: 16, background: '#1e293b', borderRadius: 8, border: '1px solid #334155', maxWidth: 480 }}>
@@ -198,6 +221,7 @@ export default function DashboardPage() {
                 <ProjectCard
                   key={p.id}
                   project={p}
+                  unreadCount={unread[p.id] || 0}
                   deleting={deletingId === p.id}
                   onCopyShare={() => copyShareLink(p.share_token)}
                   onDelete={() => deleteProject(p.id)}
@@ -286,7 +310,7 @@ function relativePath(pageUrl, baseUrl) {
   } catch { return pageUrl }
 }
 
-function ProjectCard({ project, onCopyShare, onDelete, deleting }) {
+function ProjectCard({ project, onCopyShare, onDelete, deleting, unreadCount }) {
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
   const isOwner = project.role !== 'collaborator'
@@ -297,17 +321,25 @@ function ProjectCard({ project, onCopyShare, onDelete, deleting }) {
     <div style={{ background: '#1e293b', borderRadius: 8, border: '1px solid #334155', overflow: 'hidden' }}>
       {/* Header with favicon */}
       <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <img
-          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-          alt=""
-          onError={(e) => { e.target.style.display = 'none' }}
-          style={{ width: 28, height: 28, borderRadius: 4, flexShrink: 0 }}
-        />
+        <div style={{ position: 'relative', flexShrink: 0, width: 28, height: 28 }}>
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+            alt=""
+            onError={(e) => { e.target.style.display = 'none' }}
+            style={{ width: 28, height: 28, borderRadius: 4 }}
+          />
+          {unreadCount > 0 && (
+            <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{unreadCount}</span>
+          )}
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontWeight: 700, fontSize: 15, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{domain || 'No URL'}</span>
             {!isOwner && (
               <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: '#fef3c7', color: '#92400e', textTransform: 'uppercase', flexShrink: 0 }}>Collab</span>
+            )}
+            {project.collaboratorCount > 0 && (
+              <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4338ca', flexShrink: 0 }}>👥 {project.collaboratorCount + 1}</span>
             )}
           </div>
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>

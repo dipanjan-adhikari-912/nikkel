@@ -37,7 +37,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     nikkelCount = count || 0
   }
 
-  return NextResponse.json({ ...project, role: isOwner ? 'owner' : 'collaborator', nikkelCount })
+  const { count: collaboratorCount } = await db
+    .from('project_collaborators')
+    .select('user_id', { count: 'exact', head: true })
+    .eq('project_id', params.id)
+
+  return NextResponse.json({ ...project, role: isOwner ? 'owner' : 'collaborator', nikkelCount, collaboratorCount: collaboratorCount || 0 })
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {

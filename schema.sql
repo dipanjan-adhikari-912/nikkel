@@ -207,6 +207,60 @@ create policy "Authors can update own replies"
 create index if not exists replies_nikkel_id_idx on replies (nikkel_id);
 create index if not exists replies_created_at_idx on replies (nikkel_id, created_at);
 
+-- Track per-user per-project read state for unread badge
+create table project_read_state (
+  project_id uuid not null references projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  last_read_at timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+
+alter table project_read_state enable row level security;
+
+create policy "users_manage_own_read_state"
+  on project_read_state for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create or replace function get_unread_counts(uid uuid)
+returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  result jsonb;
+begin
+  with project_ids as (
+    select id from projects where owner_id = uid
+    union
+    select project_id from project_collaborators where user_id = uid
+  ),
+  read_states as (
+    select project_id, last_read_at
+    from project_read_state
+    where user_id = uid
+  ),
+  unread as (
+    select
+      p.id as pid,
+      count(*)::int as cnt
+    from project_ids p
+    join reviews rv on rv.project_id = p.id
+    join nikkels n on n.review_id = rv.id
+    join replies r on r.nikkel_id = n.id
+    left join read_states rs on rs.project_id = p.id
+    where (rs.last_read_at is null or r.created_at > rs.last_read_at)
+      and (r.user_id is null or r.user_id != uid)
+    group by p.id
+  )
+  select jsonb_build_object(
+    'total', coalesce((select sum(cnt) from unread), 0),
+    'byProject', coalesce((select jsonb_object_agg(pid::text, cnt) from unread), '{}'::jsonb)
+  ) into result;
+  return result;
+end;
+$$;
+
 -- RPC: delete a project and all children in one transaction (avoid slow multi-round-trip deletes)
 create or replace function delete_project(pid uuid, uid uuid)
 returns jsonb

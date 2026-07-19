@@ -67,7 +67,17 @@ export async function GET(request: NextRequest) {
     return { ...p, nikkelCount, lastActivityAt, pageBreakdown }
   })
 
-  return NextResponse.json(enriched)
+  // Batch collaborator count in one query
+  const { data: collabCounts } = await db
+    .from('project_collaborators')
+    .select('project_id')
+    .in('project_id', projectIds)
+  const collabMap: Record<string, number> = {}
+  if (collabCounts) {
+    for (const c of collabCounts) { collabMap[c.project_id] = (collabMap[c.project_id] || 0) + 1 }
+  }
+
+  return NextResponse.json(enriched.map(p => ({ ...p, collaboratorCount: collabMap[p.id] || 0 })))
 }
 
 export async function POST(request: NextRequest) {
