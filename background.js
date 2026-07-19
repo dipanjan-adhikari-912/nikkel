@@ -520,7 +520,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const tabs = await chrome.tabs.query({});
         const existing = tabs.find(t => t.url && t.url.replace(/\/+$/, '') === normalized && !t.url.startsWith('chrome-extension://'));
 
-        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: true };
+        const isOwner = globalState.user?.id && project.owner_id === globalState.user.id;
+        const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !isOwner };
 
         let tab;
         let reused = false;

@@ -18,16 +18,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
+  // Owner or existing collaborator — return success, no-op
   if (project.owner_id === auth.user.id) {
-    return NextResponse.json({ error: 'You already own this project' }, { status: 400 })
+    return NextResponse.json({ ok: true })
   }
 
-  const { data, error } = await db
+  const { error } = await db
     .from('project_collaborators')
     .upsert({ project_id: params.id, user_id: auth.user.id, role: 'collaborator' }, { onConflict: 'project_id,user_id' })
     .select()
-    .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data, { status: 201 })
+  return NextResponse.json({ ok: true })
 }
