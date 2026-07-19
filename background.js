@@ -20,7 +20,7 @@ const tabState = new Map();
 
 function getTabState(tabId) {
   if (!tabState.has(tabId)) {
-    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '', readOnly: false });
+    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '', readOnly: false, barActive: false });
   }
   return tabState.get(tabId);
 }
@@ -123,7 +123,8 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     const tab = await chrome.tabs.get(activeInfo.tabId);
     ts.url = tab.url || ts.url;
   } catch {}
-  if (ts.project) {
+  if (ts.project && !ts.barActive) {
+    ts.barActive = true;
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
       payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
@@ -136,6 +137,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (changeInfo.url) {
     const ts = getTabState(tabId);
     ts.url = changeInfo.url;
+    ts.barActive = false;
     if (!ts.project && globalState.lastProject && globalState.token) {
       console.log('[BG] tabs.onUpdated — matching lastProject', { baseUrl: globalState.lastProject.baseUrl, url: changeInfo.url });
       const base = globalState.lastProject.baseUrl?.replace(/\/+$/, '');
@@ -147,6 +149,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
         ts.mode = 'annotate';
         ts.nikkels = [];
         ts.readOnly = false;
+        ts.barActive = true;
         await saveState();
         await sendToTab(tabId, {
           type: 'ACTIVATE',
@@ -208,6 +211,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           tab.review = null;
           tab.nikkels = [];
           tab.mode = 'idle';
+          tab.barActive = false;
           await saveState();
           await sendToTab(tId, { type: 'DEACTIVATE' });
         }
@@ -219,11 +223,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: false, error: 'No tab context' };
         const tab = getTabState(srcTabId);
         if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
+        if (tab.readOnly) return { ok: false, error: 'You need to join this project before dropping pins.' };
         try {
           const pCheck = await supabaseClient.request(`/rest/v1/projects?id=eq.${tab.project.id}&select=id`, { token: globalState.token });
           if (!pCheck || (Array.isArray(pCheck) && pCheck.length === 0)) throw new Error('gone');
         } catch {
-          tab.project = null; tab.review = null; tab.nikkels = []; tab.mode = 'idle';
+          tab.project = null; tab.review = null; tab.nikkels = []; tab.mode = 'idle'; tab.barActive = false;
           await saveState();
           try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
           return { ok: false, error: 'Project has been deleted. Starting a new review.' };
@@ -234,24 +239,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const existing = await supabaseClient.request(`/rest/v1/nikkels?review_id=eq.${tab.review.id}&select=idx&order=idx.desc&limit=1`, { token: globalState.token });
           if (Array.isArray(existing) && existing.length > 0 && existing[0].idx != null) nextIdx = existing[0].idx + 1;
         } catch {}
-        const saved = await pinService.create({
-          reviewId: tab.review.id,
-          pageUrl: d.pageUrl,
-          selector: d.selector,
-          pageX: d.pageX,
-          pageY: d.pageY,
-          viewportW: d.viewportW,
-          viewportH: d.viewportH,
-          tag: d.tag,
-          elementText: d.elementText,
-          comment: d.comment,
-          idx: nextIdx,
-          userId: globalState.user?.id,
-        }, globalState.token);
-        tab.nikkels.push(saved);
-        await saveState();
-        await sendToTab(srcTabId, { type: 'PIN_CONFIRMED', payload: { nikkel: saved } });
-        return { ok: true };
+        try {
+          const saved = await pinService.create({
+            reviewId: tab.review.id, pageUrl: d.pageUrl, selector: d.selector,
+            pageX: d.pageX, pageY: d.pageY, viewportW: d.viewportW, viewportH: d.viewportH,
+            tag: d.tag, elementText: d.elementText, comment: d.comment, idx: nextIdx,
+            userId: globalState.user?.id,
+          }, globalState.token);
+          tab.nikkels.push(saved);
+          await saveState();
+          await sendToTab(srcTabId, { type: 'PIN_CONFIRMED', payload: { nikkel: saved } });
+          return { ok: true };
+        } catch (e) {
+          console.warn('[Nikkel] pinService.create failed:', e.message);
+          return { ok: false, error: 'Could not save that pin — you may not have access to this project yet.' };
+        }
       }
 
       case 'GET_NIKKELS': {
@@ -420,7 +422,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (newMode === 'annotate') {
             for (const [id, t] of tabState) {
               if (id !== srcTabId && t.mode === 'annotate') {
-                t.mode = 'idle';
+                t.mode = 'idle'; t.barActive = false;
                 try { chrome.tabs.sendMessage(id, { type: 'DEACTIVATE' }); } catch {}
               }
             }
@@ -483,7 +485,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               });
               isCollab = true;
             }
-          } catch {}
+          } catch (e) {
+            console.warn('[Nikkel] Auto-claim collaborator seat failed:', e.message);
+          }
         }
         const stateForTab = { project, review: { id: review.id, share_token: rt }, mode: 'browse', nikkels: [], url: targetUrl, readOnly: !(isOwner || isCollab) };
 

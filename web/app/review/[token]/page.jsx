@@ -62,19 +62,16 @@ export default function ReviewPage({ params }) {
       }
     }
     window.addEventListener('message', handler)
-    if (document.documentElement.dataset.nikkelExtension) {
-      setExtensionDetected(true)
-      return () => window.removeEventListener('message', handler)
-    }
-    window.postMessage({ type: 'PING' }, '*')
+
     const interval = setInterval(() => {
-      if (document.documentElement.dataset.nikkelExtension) {
-        setExtensionDetected(true)
-        clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler); return
-      }
-      window.postMessage({ type: 'PING' }, '*')
+      if (document.documentElement.dataset.nikkelExtension) setExtensionDetected(true)
+      const dt = document.documentElement.dataset.nikkelToken
+      if (dt) { setToken(dt); clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
     }, 300)
+
     const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
+
+    window.postMessage({ type: 'PING' }, '*')
     return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
   }, [])
 
