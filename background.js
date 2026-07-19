@@ -308,32 +308,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
       }
 
-      case 'SIGN_UP_EMAIL': {
-        const { email: regEmail, password: regPassword } = msg.payload || {};
-        if (!regEmail || !regPassword) return { ok: false, error: 'Email and password required' };
-        let regResult;
-        try { regResult = await authService.signUpWithEmail(regEmail, regPassword); }
-        catch (e) { return { ok: false, error: e.message }; }
-        setAuthenticatedUser(regResult.user, regResult.token, regResult.refreshToken);
-        supabaseClient.setTokens(regResult.token, regResult.refreshToken);
-        await upsertProfile(globalState.user, globalState.token);
-        await saveState();
-        return { ok: true, user: globalState.user };
-      }
-
-      case 'SIGN_IN_EMAIL': {
-        const { email: signEmail, password: signPassword } = msg.payload || {};
-        if (!signEmail || !signPassword) return { ok: false, error: 'Email and password required' };
-        let signResult;
-        try { signResult = await authService.signInWithEmail(signEmail, signPassword); }
-        catch (e) { return { ok: false, error: e.message }; }
-        setAuthenticatedUser(signResult.user, signResult.token, signResult.refreshToken);
-        supabaseClient.setTokens(signResult.token, signResult.refreshToken);
-        await upsertProfile(globalState.user, globalState.token);
-        await saveState();
-        return { ok: true, user: globalState.user };
-      }
-
       case 'SIGN_IN_GOOGLE': {
         const redirectUrl = chrome.identity.getRedirectURL();
         const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
