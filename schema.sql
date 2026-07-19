@@ -241,24 +241,22 @@ begin
     where user_id = uid
   ),
   unread_events as (
-    -- New nikkels (pins/comments) by other users
+    -- New nikkels since last read (includes own)
     select pid from project_ids p
     join reviews rv on rv.project_id = p.id
     join nikkels n on n.review_id = rv.id
     left join read_states rs on rs.project_id = p.id
-    where (rs.last_read_at is null or n.created_at > rs.last_read_at)
-      and (n.owner_id is null or n.owner_id != uid)
+    where rs.last_read_at is null or n.created_at > rs.last_read_at
 
     union all
 
-    -- New replies by other users
+    -- New replies since last read (includes own)
     select pid from project_ids p
     join reviews rv on rv.project_id = p.id
     join nikkels n on n.review_id = rv.id
     join replies r on r.nikkel_id = n.id
     left join read_states rs on rs.project_id = p.id
-    where (rs.last_read_at is null or r.created_at > rs.last_read_at)
-      and (r.user_id is null or r.user_id != uid)
+    where rs.last_read_at is null or r.created_at > rs.last_read_at
   )
   select jsonb_build_object(
     'total', (select count(*) from unread_events),
