@@ -50,7 +50,27 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     return NextResponse.json({ error: 'Only the owner can delete this project' }, { status: 403 })
   }
 
-  const { error } = await db.from('projects').delete().eq('id', params.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Bulk-delete bottom-up (much faster than relying on ON DELETE CASCADE)
+  const { data: reviews } = await db.from('reviews').select('id').eq('project_id', params.id)
+  const reviewIds = (reviews || []).map((r: any) => r.id)
+
+  if (reviewIds.length > 0) {
+    const { data: nikkels } = await db.from('nikkels').select('id').in('review_id', reviewIds)
+    const nikkelIds = (nikkels || []).map((n: any) => n.id)
+    if (nikkelIds.length > 0) {
+      const { error: e1 } = await db.from('replies').delete().in('nikkel_id', nikkelIds)
+      if (e1) return NextResponse.json({ error: e1.message }, { status: 500 })
+    }
+    const { error: e2 } = await db.from('nikkels').delete().in('review_id', reviewIds)
+    if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })
+    const { error: e3 } = await db.from('reviews').delete().eq('project_id', params.id)
+    if (e3) return NextResponse.json({ error: e3.message }, { status: 500 })
+  }
+
+  const { error: e4 } = await db.from('project_collaborators').delete().eq('project_id', params.id)
+  if (e4) return NextResponse.json({ error: e4.message }, { status: 500 })
+
+  const { error: e5 } = await db.from('projects').delete().eq('id', params.id)
+  if (e5) return NextResponse.json({ error: e5.message }, { status: 500 })
   return NextResponse.json({ message: 'Project deleted' })
 }
