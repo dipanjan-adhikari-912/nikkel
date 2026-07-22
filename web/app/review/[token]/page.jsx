@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { supabaseClient } from '@/lib/client/supabase'
 
 function getToken() {
@@ -30,10 +30,9 @@ export default function ReviewPage({ params }) {
   const [token, setToken] = useState(null)
   const [replyText, setReplyText] = useState({})
   const [submitting, setSubmitting] = useState({})
-  const [extensionDetected, setExtensionDetected] = useState(false)
+  const [extensionState, setExtensionState] = useState(null) // null=checking, true=installed, false=not installed
   const [opening, setOpening] = useState(false)
   const [openingError, setOpeningError] = useState(null)
-
 
   useEffect(() => {
     const t = getToken()
@@ -53,25 +52,35 @@ export default function ReviewPage({ params }) {
   }
 
   useEffect(() => {
-    function handler(event) {
-      if (event.data?.source === 'nikkel-extension') {
-        setExtensionDetected(true)
-        const t = event.data?.token || document.documentElement.dataset.nikkelToken
-        if (t) setToken(t)
-      }
+    if (document.documentElement.dataset.nikkelInstalled) {
+      setExtensionState(true)
+      return
     }
-    window.addEventListener('message', handler)
 
-    const interval = setInterval(() => {
-      if (document.documentElement.dataset.nikkelExtension) setExtensionDetected(true)
-      const dt = document.documentElement.dataset.nikkelToken
-      if (dt) { setToken(dt); clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
+    function onReady() { setExtensionState(true) }
+    document.addEventListener('nikkel:extension-ready', onReady)
+
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.dataset.nikkelInstalled) {
+        setExtensionState(true)
+        observer.disconnect()
+        clearTimeout(timer)
+        document.removeEventListener('nikkel:extension-ready', onReady)
+      }
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-nikkel-installed'] })
+
+    const timer = setTimeout(() => {
+      observer.disconnect()
+      document.removeEventListener('nikkel:extension-ready', onReady)
+      setExtensionState(false)
     }, 300)
 
-    const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
-
-    window.postMessage({ type: 'PING' }, '*')
-    return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+      document.removeEventListener('nikkel:extension-ready', onReady)
+    }
   }, [])
 
   useEffect(() => {
@@ -85,10 +94,10 @@ export default function ReviewPage({ params }) {
     return () => window.removeEventListener('message', resultHandler)
   }, [])
 
-  const handleOpenReview = useCallback(() => {
+  const handleOpenReview = () => {
     setOpening(true); setOpeningError(null)
     window.postMessage({ action: 'LOAD_REVIEW', reviewToken: params.token }, '*')
-  }, [params.token])
+  }
 
   useEffect(() => {
     fetch(`/api/board/${params.token}`)
@@ -105,7 +114,7 @@ export default function ReviewPage({ params }) {
       })
   }, [params.token])
 
-  const submitReply = useCallback(async (nikkelId) => {
+  const submitReply = async (nikkelId) => {
     const text = replyText[nikkelId]?.trim()
     if (!text || !token) return
     setSubmitting(s => ({ ...s, [nikkelId]: true }))
@@ -128,7 +137,7 @@ export default function ReviewPage({ params }) {
       alert(e.message)
     }
     setSubmitting(s => ({ ...s, [nikkelId]: false }))
-  }, [token, params.token, replyText])
+  }
 
   if (error === 'not-found') {
     return <Shell><Icon>🔗</Icon><Title>Review not found</Title><Text>This link may be invalid or the review was removed.</Text></Shell>
@@ -147,7 +156,6 @@ export default function ReviewPage({ params }) {
       <Shell>
         <div style={{ width: 28, height: 28, border: '2px solid #334155', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'nikkel-spin 0.6s linear infinite' }} />
         <Title>Loading review...</Title>
-        <Text style={{ color: '#64748b' }}>Fetching review details</Text>
       </Shell>
     )
   }
@@ -179,7 +187,7 @@ export default function ReviewPage({ params }) {
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{project.title || project.name || 'Untitled'}</h1>
             {pageUrl && <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', fontSize: 13, textDecoration: 'none' }}>{domain}</a>}
           </div>
-          {extensionDetected && (
+          {extensionState === true ? (
             <button
               onClick={handleOpenReview}
               disabled={opening}
@@ -187,7 +195,11 @@ export default function ReviewPage({ params }) {
             >
               {opening ? 'Opening...' : 'Open in Nikkel'}
             </button>
-          )}
+          ) : extensionState === false ? (
+            <a href="/download" style={{ padding: '8px 16px', background: '#6366f1', color: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>
+              Install Nikkel
+            </a>
+          ) : null}
         </div>
         <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#64748b' }}>
           <span>{pinCount} {pinCount === 1 ? 'annotation' : 'annotations'}</span>
@@ -205,21 +217,22 @@ export default function ReviewPage({ params }) {
           <div key={pageUrl} style={{ marginBottom: 32 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '6px 8px', borderRadius: 6, color: '#94a3b8', background: '#1e293b' }}>
               <span style={{ fontSize: 14 }}>📄</span>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageUrl}</span>
+              <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ flex: 1, minWidth: 0, fontSize: 13, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#94a3b8', textDecoration: 'none' }} onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>{pageUrl}</a>
               <span style={{ padding: '1px 7px', borderRadius: 8, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>{pageNikkels.length}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {pageNikkels.map(nikkel => (
-                <NikkelCard
-                  key={nikkel.id}
-                  nikkel={nikkel}
-                  token={token}
-                  replyText={replyText[nikkel.id] || ''}
-                  submitting={submitting[nikkel.id]}
-                  onReplyChange={v => setReplyText(r => ({ ...r, [nikkel.id]: v }))}
-                  onSubmit={() => submitReply(nikkel.id)}
-                  onSignIn={signInWithGoogle}
-                />
+                  <NikkelCard
+                    key={nikkel.id}
+                    nikkel={nikkel}
+                    token={token}
+                    extensionDetected={extensionState === true}
+                    replyText={replyText[nikkel.id] || ''}
+                    submitting={submitting[nikkel.id]}
+                    onReplyChange={v => setReplyText(r => ({ ...r, [nikkel.id]: v }))}
+                    onSubmit={() => submitReply(nikkel.id)}
+                    onSignIn={signInWithGoogle}
+                  />
               ))}
             </div>
           </div>
@@ -235,7 +248,7 @@ export default function ReviewPage({ params }) {
   )
 }
 
-function NikkelCard({ nikkel, token, replyText, submitting, onReplyChange, onSubmit, onSignIn }) {
+function NikkelCard({ nikkel, token, extensionDetected, replyText, submitting, onReplyChange, onSubmit, onSignIn }) {
   const [showReplies, setShowReplies] = useState(false)
   const replies = nikkel.replies || []
 
@@ -281,31 +294,39 @@ function NikkelCard({ nikkel, token, replyText, submitting, onReplyChange, onSub
         </div>
       )}
 
-      {/* Reply form / sign-in prompt */}
-      {token ? (
-        <div style={{ borderTop: '1px solid #334155', padding: 10 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={replyText}
-              onChange={e => onReplyChange(e.target.value)}
-              placeholder="Write a reply..."
-              style={{ flex: 1, padding: '7px 10px', background: '#0f172a', border: '1px solid #334155', borderRadius: 4, color: '#e2e8f0', fontSize: 13, outline: 'none' }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (replyText.trim()) onSubmit() } }}
-            />
-            <button
-              onClick={onSubmit}
-              disabled={submitting || !replyText.trim()}
-              style={{ padding: '7px 14px', background: submitting || !replyText.trim() ? '#334155' : '#6366f1', color: '#fff', border: 'none', borderRadius: 4, cursor: submitting || !replyText.trim() ? 'default' : 'pointer', fontSize: 13, fontWeight: 500 }}
-            >
-              {submitting ? 'Sending...' : 'Reply'}
+      {/* ponytail: reply section gated on extension detection */}
+      {extensionDetected ? (
+        token ? (
+          <div style={{ borderTop: '1px solid #334155', padding: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={replyText}
+                onChange={e => onReplyChange(e.target.value)}
+                placeholder="Write a reply..."
+                style={{ flex: 1, padding: '7px 10px', background: '#0f172a', border: '1px solid #334155', borderRadius: 4, color: '#e2e8f0', fontSize: 13, outline: 'none' }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (replyText.trim()) onSubmit() } }}
+              />
+              <button
+                onClick={onSubmit}
+                disabled={submitting || !replyText.trim()}
+                style={{ padding: '7px 14px', background: submitting || !replyText.trim() ? '#334155' : '#6366f1', color: '#fff', border: 'none', borderRadius: 4, cursor: submitting || !replyText.trim() ? 'default' : 'pointer', fontSize: 13, fontWeight: 500 }}
+              >
+                {submitting ? 'Sending...' : 'Reply'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ borderTop: '1px solid #334155', padding: 10, textAlign: 'center' }}>
+            <button onClick={onSignIn} style={{ padding: '7px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+              Sign in to reply
             </button>
           </div>
-        </div>
+        )
       ) : (
         <div style={{ borderTop: '1px solid #334155', padding: 10, textAlign: 'center' }}>
-          <button onClick={onSignIn} style={{ padding: '7px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-            Sign in to reply
-          </button>
+          <a href="/download" style={{ padding: '7px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 500, textDecoration: 'none', display: 'inline-block' }}>
+            Get Nikkel to reply
+          </a>
         </div>
       )}
     </div>
