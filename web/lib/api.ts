@@ -14,7 +14,7 @@ export async function getSharedProject(shareId: string): Promise<SharedProject> 
   })
 
   if (res.status === 404) {
-    throw new NotFoundError('Project not found')
+    throw new Error('Project not found')
   }
 
   if (!res.ok) {
@@ -22,11 +22,4 @@ export async function getSharedProject(shareId: string): Promise<SharedProject> 
   }
 
   return res.json()
-}
-
-export class NotFoundError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NotFoundError'
-  }
 }

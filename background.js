@@ -1,8 +1,7 @@
-import { container } from './src/di/index.js';
+import { SupabaseClient, SUPABASE_URL, SUPABASE_ANON } from './src/infrastructure/supabase/SupabaseClient.js';
 import { VIEWER_BASE, API_URL } from './src/config/index.js';
-import { SUPABASE_URL, SUPABASE_ANON } from './src/infrastructure/supabase/SupabaseClient.js';
 
-const { supabaseClient, authService, projectService, pinService, shareService } = container;
+const supabaseClient = new SupabaseClient();
 
 supabaseClient.onRefresh((token, refreshToken) => {
   syncTokens(token, refreshToken);
@@ -218,9 +217,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to start a review' };
         const { tabId: tId, title, url } = msg.payload;
         console.log('[BG] START_REVIEW — user.id:', globalState.user?.id, 'email:', globalState.user?.email, 'JWT sub:', jwtSub(globalState.token));
-        const project = await projectService.create(title || 'Untitled Review', url || '', globalState.user?.id, globalState.token);
-        console.log('[BG] START_REVIEW — project created', { projectId: project.id, owner_id: project.ownerId || project.owner_id });
-        const review = await shareService.ensureProjectReview(project.id, globalState.user?.id, globalState.token);
+        const projectRes = await supabaseClient.request('/rest/v1/projects', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ title: title || 'Untitled Review', base_url: url || '', owner_id: globalState.user?.id }) });
+        const project = Array.isArray(projectRes) ? projectRes[0] : projectRes;
+        console.log('[BG] START_REVIEW — project created', { projectId: project.id, owner_id: project.owner_id });
+        let review = await supabaseClient.request(`/rest/v1/reviews?project_id=eq.${project.id}&order=created_at.desc&limit=1`, { token: globalState.token }).then(r => Array.isArray(r) ? r[0] : null).catch(() => null);
+        if (!review) {
+          const reviewRes = await supabaseClient.request('/rest/v1/reviews', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ project_id: project.id, owner_id: globalState.user?.id }) });
+          review = Array.isArray(reviewRes) ? reviewRes[0] : reviewRes;
+        }
         console.log('[BG] START_REVIEW — review result', { reviewId: review?.id, owner_id: review?.owner_id });
         if (!review) console.error('[BG] START_REVIEW: ensureProjectReview returned null — review not created');
         const tab = getTabState(tId);
@@ -282,18 +286,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (Array.isArray(existing) && existing.length > 0 && existing[0].idx != null) nextIdx = existing[0].idx + 1;
         } catch {}
         try {
-          const saved = await pinService.create({
-            reviewId: tab.review.id, pageUrl: d.pageUrl, selector: d.selector,
-            pageX: d.pageX, pageY: d.pageY, viewportW: d.viewportW, viewportH: d.viewportH,
-            tag: d.tag, elementText: d.elementText, comment: d.comment, idx: nextIdx,
-            userId: globalState.user?.id,
-          }, globalState.token);
+          const savedRes = await supabaseClient.request('/rest/v1/nikkels', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ review_id: tab.review.id, page_url: d.pageUrl, dom_selector: d.selector, x: d.pageX, y: d.pageY, viewport_w: d.viewportW, viewport_h: d.viewportH, tag: d.tag, element_text: d.elementText, comment: d.comment, idx: nextIdx, owner_id: globalState.user?.id }) });
+          const saved = Array.isArray(savedRes) ? savedRes[0] : savedRes;
           tab.nikkels.push(saved);
           await saveState();
           await sendToTab(srcTabId, { type: 'PIN_CONFIRMED', payload: { nikkel: saved } });
           return { ok: true };
         } catch (e) {
-          console.warn('[Nikkel] pinService.create failed:', e.message);
+          console.warn('[Nikkel] create nikkel failed:', e.message);
           return { ok: false, error: 'Could not save that pin — you may not have access to this project yet.' };
         }
       }
@@ -309,7 +309,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const allPages = msg.payload?.allPages;
         const pageUrl = allPages ? undefined : (msg.payload?.pageUrl || tab.url);
         const opts = pageUrl ? { pageUrl } : {};
-        const nikkels = await pinService.findByReview(tab.review.id, opts, globalState.token);
+        let nikkelsPath = `/rest/v1/nikkels?review_id=eq.${tab.review.id}&order=idx.asc`;
+        if (opts.pageUrl) nikkelsPath += `&page_url=eq.${encodeURIComponent(opts.pageUrl)}`;
+        const nikkels = await supabaseClient.request(nikkelsPath, { token: globalState.token });
         if (!allPages) tab.nikkels = nikkels;
         return { ok: true, nikkels };
       }
@@ -393,7 +395,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const refreshToken = params.get('refresh_token');
         if (!accessToken) return { ok: false, error: 'No access token in response' };
 
-        const userInfo = await authService.getUserInfo(accessToken);
+        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${accessToken}` } }).then(r => r.json());
+        const userInfo = { id: userRes.id, email: userRes.email, name: userRes.user_metadata?.full_name || userRes.user_metadata?.name || null };
         console.log('[BG] SIGN_IN_GOOGLE — Google user info', { id: userInfo.id, email: userInfo.email, name: userInfo.name });
         supabaseClient.setTokens(accessToken, refreshToken);
         setAuthenticatedUser(userInfo, accessToken, refreshToken);
@@ -553,7 +556,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         setLastProject(project, review);
         await saveState();
         try {
-          const nikkels = await pinService.findByReview(review.id, {}, globalState.token);
+          const nikkels = await supabaseClient.request(`/rest/v1/nikkels?review_id=eq.${review.id}&order=idx.asc`, { token: globalState.token });
           stateForTab.nikkels = nikkels;
           await sendToTab(tab.id, {
             type: 'LOAD_SESSION',
@@ -579,14 +582,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         } catch {} // network blip, let the real operation fail naturally
 
-        let review = await shareService.ensureProjectReview(tab.project.id, globalState.user?.id, globalState.token);
+        let review = await supabaseClient.request(`/rest/v1/reviews?project_id=eq.${tab.project.id}&order=created_at.desc&limit=1`, { token: globalState.token }).then(r => Array.isArray(r) ? r[0] : null).catch(() => null);
+        if (!review) {
+          const reviewRes = await supabaseClient.request('/rest/v1/reviews', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ project_id: tab.project.id, owner_id: globalState.user?.id }) });
+          review = Array.isArray(reviewRes) ? reviewRes[0] : reviewRes;
+        }
         if (!review) {
           console.error('[BG] SHARE: ensureProjectReview returned null');
           return { ok: false, error: 'Failed to create review' };
         }
         tab.review = review;
 
-        const shareToken = await shareService.ensureShareToken(review.id, globalState.token);
+        let shareToken = review.share_token;
+        if (!shareToken) {
+          const bytes = new Uint8Array(8); crypto.getRandomValues(bytes);
+          shareToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+          await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, { method: 'PATCH', token: globalState.token, body: JSON.stringify({ share_token: shareToken }) });
+        }
         const shareUrl = `${VIEWER_BASE}/review/${shareToken}`;
         return { ok: true, shareUrl };
       }
@@ -633,7 +645,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             try { const e = await res.json(); msg = e.message || e.error || e.msg || msg; } catch {}
             return { ok: false, error: msg };
           }
-          const updatedUser = await authService.getUserInfo(globalState.token);
+          const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${globalState.token}` } }).then(r => r.json());
+          const updatedUser = { id: userRes.id, email: userRes.email, name: userRes.user_metadata?.full_name || userRes.user_metadata?.name || null };
           setAuthenticatedUser(updatedUser, globalState.token, globalState.refreshToken);
           await upsertProfile(globalState.user, globalState.token);
           await saveState();

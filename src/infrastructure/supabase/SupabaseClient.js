@@ -36,36 +36,6 @@ export class SupabaseClient {
     if (prefer) headers['Prefer'] = prefer;
     const res = await fetch(`${SUPABASE_URL}${path}`, { ...fetchOptions, headers });
 
-    if (res.status === 401 && this._refreshToken && effectiveToken) {
-      try {
-        const refreshRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-          method: 'POST',
-          headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: this._refreshToken }),
-        });
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          this._token = refreshData.access_token;
-          this._refreshToken = refreshData.refresh_token || this._refreshToken;
-          if (this._onRefresh) this._onRefresh(this._token, this._refreshToken);
-          headers['Authorization'] = `Bearer ${this._token}`;
-          const retry = await fetch(`${SUPABASE_URL}${path}`, { ...fetchOptions, headers });
-          if (!retry.ok) {
-            let msg = retry.statusText;
-            try { const e = await retry.json(); msg = e.message || e.error || e.msg || msg; } catch {}
-            throw new Error(msg);
-          }
-          if (retry.status === 204 || retry.status === 201) {
-            const text = await retry.text();
-            return text ? JSON.parse(text) : null;
-          }
-          return retry.json();
-        }
-      } catch (e) {
-        console.warn('[Nikkel] token refresh failed', e?.message);
-      }
-    }
-
     if (!res.ok) {
       let errMsg = res.statusText;
       try { const err = await res.json(); errMsg = err.message || err.error || err.msg || errMsg; } catch {}

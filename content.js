@@ -21,85 +21,377 @@ function bgMsg(msg, cb) {
 
 const BAR_HTML = `
   <style>
-    :host { all: initial; display: block; position: fixed; bottom: 0; left: 0; right: 0; z-index: 2147483647; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; }
-    #bar { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; background: #0f172a; border-top: 1px solid #1e293b; color: #94a3b8; box-sizing: border-box; }
-    .bar-section { display: flex; align-items: center; gap: 6px; }
-    .bar-sep { width: 1px; height: 20px; background: #1e293b; margin: 0 4px; }
-    #projectName { color: #e2e8f0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-    #modeDot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; flex-shrink: 0; }
-    #modeLabel { color: #e2e8f0; font-weight: 500; }
-    #modeToggle { display: flex; gap: 0; border: 1px solid #334155; border-radius: 4px; overflow: hidden; }
-    #modeToggle button { background: #1e293b; color: #64748b; border: none; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
-    #modeToggle button:not(.active):hover { background: #334155; color: #94a3b8; }
-    #modeToggle button.active { background: #6366f1; color: #fff; font-weight: 500; }
-    #modeToggle button:first-child { border-right: 1px solid #334155; }
-    #inspIdle { color: #64748b; font-style: italic; }
-    #inspLive { display: none; gap: 8px; flex-wrap: wrap; }
-    #inspLive span { white-space: nowrap; }
-    .il { color: #64748b; }
-    .iv { color: #e2e8f0; }
-    #eyeBtn, #pinsBtn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
-    #eyeBtn:hover, #pinsBtn:hover { background: #334155; }
-    #eyeBtn.hidden { color: #475569; }
-    #pinsBadge { background: #6366f1; color: #fff; border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
-    #pinDrawer { display: none; position: absolute; bottom: 42px; left: 0; right: 0; max-height: min(280px, calc(100vh - 42px)); overflow-y: auto; background: #0f172a; border-bottom: 1px solid #1e293b; padding: 4px 0; box-shadow: 0 -4px 12px rgba(0,0,0,.3); }
+    :host { all: initial; display: block; position: fixed; bottom: 0; left: 0; right: 0; z-index: 2147483647; font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; }
+    *,*::before,*::after { box-sizing: border-box; }
+
+    .nikkel-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 20px;
+      background: #101715;
+      border-radius: 48px;
+      border: 1px solid transparent;
+      background-image:
+        linear-gradient(#101715, #101715),
+        linear-gradient(92deg, #9dafa9 -16%, #dfdfdfa8 19%, #71b9a1 64%);
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
+      max-width: 100%;
+      margin: 0 12px 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.4);
+    }
+    .nikkel-bar,
+    .nikkel-bar * { cursor: default; }
+
+    .icon-tile {
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1d2a26;
+      border-radius: 10px;
+    }
+
+    .bar-brand {
+      color: #e2e8f0;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 20px;
+      border: 1px solid #ffffff1f;
+      white-space: nowrap;
+    }
+    .pill-filled { background: #101715; }
+    .pill-mode { background: transparent; border-color: #ffffff1f; }
+    .pill-mode .annotate-label { font-weight: 600; }
+    .pill-nikkels { border-color: #71b9a14d; }
+
+    .switch {
+      width: 44px;
+      height: 22px;
+      background: #212826;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      padding: 1px;
+      cursor: pointer;
+      flex-shrink: 0;
+      border: none;
+    }
+    .switch.on { justify-content: flex-end; }
+    .switch.off { justify-content: flex-start; }
+
+    .badge {
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #71b9a1;
+      color: #101715;
+      font-weight: 600;
+      font-size: 13px;
+      border-radius: 40px;
+      flex-shrink: 0;
+    }
+
+    .btn-share {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: #71b9a1;
+      color: #101715;
+      font-weight: 500;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-share:hover { background: #7fc4ac; }
+    .btn-share:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .btn-share:disabled { opacity: .5; cursor: default; }
+
+    .chevron-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #71b9a1;
+      flex-shrink: 0;
+    }
+    .chevron-btn:hover { background: #ffffff0f; }
+    .chevron-btn:focus-visible { outline: 2px solid #71b9a1; outline-offset: 2px; }
+
+    .spacer { flex: 1; min-width: 12px; }
+
+    #eyeBtn { cursor: pointer; background: #101715; }
+    #eyeBtn:hover { background: #1d2a26; }
+    #eyeBtn.hidden .eye-visible { display: block; }
+    #eyeBtn.hidden .eye-hidden { display: none; }
+    #eyeBtn .eye-visible { display: none; }
+    #eyeBtn .eye-hidden { display: block; }
+
+    .pill-filled:hover { background: #1d2a26; }
+    .pill-mode:hover { background: #1d2a26; }
+    .pill-mode { position: relative; }
+    .pill-mode .tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1d2a26;
+      border: 1px solid #ffffff1f;
+      border-radius: 8px;
+      padding: 6px 10px;
+      white-space: nowrap;
+      font-size: 12px;
+      color: #e2e8f0;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .pill-mode:hover .tooltip { display: block; }
+    .pill-mode .tooltip kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-family: 'Instrument Sans', sans-serif;
+      background: #101715;
+      border: 1px solid #ffffff1f;
+      border-radius: 4px;
+      color: #71b9a1;
+    }
+
+    #projectName { display: none; }
+    #logoIcon { cursor: pointer; position: relative; }
+    #logoIcon .tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      background: #1d2a26;
+      border: 1px solid #ffffff1f;
+      border-radius: 8px;
+      padding: 6px 10px;
+      white-space: nowrap;
+      font-size: 12px;
+      color: #e2e8f0;
+      pointer-events: none;
+      z-index: 1;
+    }
+    #logoIcon:hover .tooltip { display: block; }
+    #logoIcon .tooltip kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-family: 'Instrument Sans', sans-serif;
+      background: #101715;
+      border: 1px solid #ffffff1f;
+      border-radius: 4px;
+      color: #71b9a1;
+    }
+
+    #pinDrawer {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 12px);
+      right: 12px;
+      left: auto;
+      width: 400px;
+      max-width: 90%;
+      max-height: min(280px, calc(100vh - 100px));
+      overflow-y: auto;
+      background: #101715;
+      border: 1px solid #ffffff1f;
+      border-radius: 12px;
+      padding: 4px 0;
+      box-shadow: 0 -4px 24px rgba(0,0,0,.4);
+    }
     #pinDrawer.visible { display: block; }
-    #pinDrawerHeader { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px 8px; border-bottom: 1px solid #1e293b; margin-bottom: 4px; }
+    #pinDrawerHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px 8px;
+      border-bottom: 1px solid #ffffff1f;
+      margin-bottom: 4px;
+    }
     #pinDrawerHeader span { color: #e2e8f0; font-weight: 600; font-size: 13px; }
-    #pinDrawerClose { background: none; border: none; color: #64748b; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+    #pinDrawerClose {
+      background: none;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      line-height: 1;
+    }
     #pinDrawerClose:hover { color: #e2e8f0; }
     .pdItem { display: flex; gap: 8px; padding: 5px 12px; align-items: flex-start; cursor: default; }
-    .pdItem:hover { background: #1e293b; }
-    .pdIdx { width: 22px; height: 22px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+    .pdItem:hover { background: #1d2a26; }
+    .pdIdx {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #71b9a1; color: #101715;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    }
     .pdBody { flex: 1; min-width: 0; }
-    .pdPage { font-size: 11px; color: #818cf8; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .pdPage { font-size: 11px; color: #71b9a1; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
     .pdMeta { font-size: 12px; color: #94a3b8; margin-top: 1px; }
     .pdMeta strong { color: #64748b; font-weight: 500; }
     .pdComment { font-size: 12px; color: #e2e8f0; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #pinDrawerEmpty { padding: 16px; text-align: center; color: #64748b; font-size: 13px; }
-    #shareBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 500; font-size: 12px; margin-left: auto; }
-    #shareBtn:hover { background: #4f46e5; }
-    #dashboardLink { color: #94a3b8; text-decoration: none; font-size: 12px; margin-left: auto; margin-right: 6px; padding: 4px 8px; border-radius: 4px; white-space: nowrap; }
-    #dashboardLink:hover { color: #e2e8f0; background: #1e293b; }
-    #shareOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 2147483647; align-items: center; justify-content: center; }
+
+    #shareOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 2147483647;
+      align-items: center;
+      justify-content: center;
+    }
     #shareOverlay.visible { display: flex; }
-    #shareModal { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+    #shareModal {
+      background: #101715;
+      border: 1px solid #ffffff1f;
+      border-radius: 12px;
+      padding: 20px;
+      width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
     #shareHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
     #shareHead span { font-weight: 600; color: #e2e8f0; font-size: 15px; }
     #shareClose { background: transparent; border: none; color: #64748b; cursor: pointer; font-size: 18px; padding: 0 4px; line-height: 1; }
     #shareClose:hover { color: #e2e8f0; }
-    #shareUrlTxt { width: 100%; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 4px; padding: 8px; font-size: 13px; margin-bottom: 8px; box-sizing: border-box; }
-    #copyBtn { background: #6366f1; border: none; color: #fff; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 500; }
-    #copyBtn:hover { background: #4f46e5; }
+    #shareUrlTxt {
+      width: 100%; background: #1d2a26; border: 1px solid #ffffff1f;
+      color: #e2e8f0; border-radius: 4px; padding: 8px;
+      font-size: 13px; margin-bottom: 8px; box-sizing: border-box;
+    }
+    #copyBtn {
+      background: #71b9a1; border: none; color: #101715;
+      border-radius: 4px; padding: 6px 14px; cursor: pointer;
+      font-size: 12px; font-weight: 500;
+    }
+    #copyBtn:hover { background: #7fc4ac; }
     #shareMeta { font-size: 11px; color: #64748b; margin-top: 8px; }
+
+    #dashboardLink { display: none; }
+    #modeDot, #modeLabel, #browseBtn, #annotateBtn, #inspIdle, #inspLive { display: none; }
   </style>
-  <div id="bar">
-    <div class="bar-section">
-      <span id="projectName"></span>
+
+  <div class="nikkel-bar" role="toolbar" aria-label="Nikkel review toolbar">
+
+    <div class="icon-tile" id="logoIcon" role="button" tabindex="0" aria-label="Open dashboard">
+      <div class="tooltip"><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>D</kbd> to view Dashboard.</h2></div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="7" height="9" rx="2" stroke="url(#logoGrad)" stroke-width="1.8"/>
+        <rect x="14" y="3" width="7" height="5" rx="2" stroke="url(#logoGrad)" stroke-width="1.8"/>
+        <rect x="14" y="12" width="7" height="9" rx="2" stroke="url(#logoGrad)" stroke-width="1.8"/>
+        <rect x="3" y="16" width="7" height="5" rx="2" stroke="url(#logoGrad)" stroke-width="1.8"/>
+        <defs>
+          <linearGradient id="logoGrad" x1="0" y1="0" x2="24" y2="24">
+            <stop offset="0%" stop-color="#71b9a1"/>
+            <stop offset="100%" stop-color="#ccdbd6"/>
+          </linearGradient>
+        </defs>
+      </svg>
     </div>
-    <div class="bar-sep"></div>
-    <div class="bar-section">
-      <span id="modeDot" class="browse"></span>
-      <span id="modeLabel">Browse</span>
-      <span id="modeToggle">
-        <button id="browseBtn">Browse</button>
-        <button id="annotateBtn">Annotate</button>
-      </span>
+
+    <span class="bar-brand" id="projectName"></span>
+    <span class="bar-brand">nikkel</span>
+
+    <div class="pill pill-mode">
+      <div class="flex items-center gap-1.5" style="display:flex;align-items:center;gap:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#71b9a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4l7 17 2-7 7-2z"/>
+        </svg>
+        <span id="modeBrowseLabel" style="font-size:14px">Browse</span>
+      </div>
+
+      <button class="switch off" role="switch" aria-checked="false" aria-label="Toggle mode" id="modeSwitch">
+        <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
+          <rect x="4" y="2" width="28" height="28" rx="10" fill="white"/>
+          <path d="M21.3898 24L18 20H20.6059L23 24H21.3898Z" fill="#999999"/>
+          <path d="M20.1314 12C19.5743 12 19.0548 11.9268 18.5729 11.7805C18.091 11.6341 17.6318 11.4634 17.1951 11.2683C16.7734 11.0569 16.3518 10.878 15.9302 10.7317C15.5236 10.5854 15.1095 10.5122 14.6879 10.5122C14.3114 10.5122 13.9952 10.6098 13.7392 10.8049C13.4832 11 13.3176 11.3171 13.2423 11.7561H12C12.0903 11.1545 12.2485 10.6504 12.4743 10.2439C12.7153 9.8374 13.0315 9.52846 13.423 9.31707C13.8145 9.10569 14.2888 9 14.846 9C15.3881 9 15.9001 9.07317 16.3819 9.21951C16.8789 9.36585 17.3457 9.54472 17.7823 9.7561C18.2341 9.95122 18.6632 10.122 19.0698 10.2683C19.4914 10.4146 19.9055 10.4878 20.3121 10.4878C20.7036 10.4878 21.0274 10.3902 21.2834 10.1951C21.5394 10 21.6975 9.68293 21.7577 9.2439H23C22.9247 9.84553 22.7666 10.3496 22.5257 10.7561C22.2847 11.1626 21.9685 11.4715 21.577 11.6829C21.1855 11.8943 20.7036 12 20.1314 12Z" fill="#999999"/>
+        </svg>
+      </button>
+
+      <div class="flex items-center gap-1.5" style="display:flex;align-items:center;gap:6px">
+        <span id="modeAnnotateLabel" style="font-size:14px">Annotate</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#71b9a1" stroke-width="2.5" stroke-linecap="round">
+          <path d="M12 4v16M4 12h16"/>
+        </svg>
+      </div>
+      <div class="tooltip"><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>~</kbd> to toggle modes.</h2></div>
     </div>
-    <div class="bar-sep"></div>
-    <div class="bar-section" id="inspIdle">Hover over elements to inspect</div>
-    <div class="bar-section" id="inspLive">
-      <span><span class="il">Tag:</span> <span class="iv" id="iTag">—</span></span>
-      <span><span class="il">Text:</span> <span class="iv" id="iText">—</span></span>
-      <span><span class="il">Sel:</span> <span class="iv" id="iSel">—</span></span>
-      <span><span class="il">XY:</span> <span class="iv" id="iXY">—</span></span>
+
+    <button class="pill pill-filled" id="eyeBtn" aria-label="Toggle nikkels visibility">
+      <svg class="eye-visible" width="16" height="16" viewBox="0 0 44 44" fill="none" stroke="url(#logoGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22.0002 9.16675C10.4373 9.16675 4.82733 19.5856 3.83183 21.6481C3.77862 21.7578 3.75098 21.8781 3.75098 22.0001C3.75098 22.122 3.77862 22.2424 3.83183 22.3521C4.8255 24.4146 10.4355 34.8334 22.0002 34.8334C33.5648 34.8334 39.173 24.4146 40.1685 22.3521C40.2217 22.2424 40.2493 22.122 40.2493 22.0001C40.2493 21.8781 40.2217 21.7578 40.1685 21.6481C39.1748 19.5856 33.5648 9.16675 22.0002 9.16675Z"/>
+        <path d="M22 27.5C25.0376 27.5 27.5 25.0376 27.5 22C27.5 18.9624 25.0376 16.5 22 16.5C18.9624 16.5 16.5 18.9624 16.5 22C16.5 25.0376 18.9624 27.5 22 27.5Z"/>
+      </svg>
+      <svg class="eye-hidden" width="16" height="16" viewBox="0 0 44 44" fill="none" stroke="url(#logoGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.8334 11.6637C15.606 10.0154 18.7746 9.15228 22.0001 9.16667C33.5629 9.16667 39.1729 19.5855 40.1684 21.648C40.2784 21.8735 40.2784 22.1265 40.1684 22.3538C39.5231 23.6885 36.9491 28.5175 32.0834 31.7607M25.6667 34.4667C24.4599 34.7117 23.2315 34.8346 22.0001 34.8333C10.4372 34.8333 4.82724 24.4145 3.83174 22.352C3.77796 22.2418 3.75 22.1208 3.75 21.9982C3.75 21.8755 3.77796 21.7545 3.83174 21.6443C4.23324 20.8157 5.37174 18.6523 7.33341 16.3552M18.3334 17.9007C19.3812 16.964 20.7479 16.464 22.1528 16.5033C23.5577 16.5426 24.8942 17.1183 25.888 18.1121C26.8818 19.1059 27.4574 20.4424 27.4967 21.8473C27.5361 23.2522 27.0361 24.6188 26.0994 25.6667M5.50008 5.5L38.5001 38.5"/>
+      </svg>
+      <span id="eyeBtnText" style="color:#ffffffcc;font-size:14px">Hide nikkels</span>
+    </button>
+
+    <div class="spacer"></div>
+
+    <div class="pill pill-nikkels" id="pinsBtn" role="button" tabindex="0" aria-label="Nikkels list">
+      <button class="chevron-btn" aria-label="Expand nikkels list">
+        <svg width="14" height="14" viewBox="0 0 10 5" fill="none" stroke="#71b9a1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 5L5 0L0 5"/>
+        </svg>
+      </button>
+      <span style="color:#fff;font-size:14px">nikkels</span>
+      <span class="badge" id="pinsBadge">0</span>
     </div>
-    <div class="bar-sep"></div>
-    <button id="eyeBtn">👁</button>
-    <button id="pinsBtn">📋<span id="pinsBadge">0</span></button>
-    <a id="dashboardLink" href="#" target="_blank">Dashboard</a>
-    <button id="shareBtn">🔗 Share</button>
+
+    <button class="btn-share" id="shareBtn">
+      <svg width="14" height="14" viewBox="0 0 16 14" fill="none" stroke="#101715" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 7L9.6 0v3.5C6.4 3.5 0 5.6 0 14c0-1.17 1.92-3.5 9.6-3.5V14L16 7Z"/>
+      </svg>
+      <span id="shareBtnText">Share</span>
+    </button>
   </div>
+
+  <span id="modeDot"></span>
+  <span id="modeLabel">Browse</span>
+  <button id="browseBtn" style="display:none"></button>
+  <button id="annotateBtn" style="display:none"></button>
+  <div id="inspIdle" style="display:none"></div>
+  <div id="inspLive" style="display:none">
+    <span><span class="il">Tag:</span> <span class="iv" id="iTag">—</span></span>
+    <span><span class="il">Text:</span> <span class="iv" id="iText">—</span></span>
+    <span><span class="il">Sel:</span> <span class="iv" id="iSel">—</span></span>
+    <span><span class="il">XY:</span> <span class="iv" id="iXY">—</span></span>
+  </div>
+  <a id="dashboardLink" href="#" target="_blank" style="display:none">Dashboard</a>
+
   <div id="pinDrawer">
     <div id="pinDrawerHeader">
       <span>All Pins</span>
@@ -107,6 +399,7 @@ const BAR_HTML = `
     </div>
     <div id="pinDrawerList"></div>
   </div>
+
   <div id="shareOverlay">
     <div id="shareModal">
       <div id="shareHead">
@@ -223,6 +516,7 @@ let isPinsVisible = true;
 let commentResolve = null;
 let currentSessionId = null;
 let currentReviewId = null;
+let currentDashboardUrl = '';
 let readOnly = false;
 let pollInterval = null;
 
@@ -305,23 +599,26 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly, dashboardUrl });
   currentSessionId = sessionId || null;
   currentReviewId = reviewId || null;
+  currentDashboardUrl = dashboardUrl || '';
   readOnly = isReadOnly || false;
   barHost = createShadowHost('nikkel-bar-host');
   const shadow = barHost.attachShadow({ mode: 'open' });
   shadow.innerHTML = BAR_HTML;
 
   const projectNameEl = qs(shadow, 'projectName');
-  const browseBtn = qs(shadow, 'browseBtn');
-  const annotateBtn = qs(shadow, 'annotateBtn');
   const inspIdle = qs(shadow, 'inspIdle');
   const inspLive = qs(shadow, 'inspLive');
   const pinsBtn = qs(shadow, 'pinsBtn');
   const pinsBadge = qs(shadow, 'pinsBadge');
   const eyeBtn = qs(shadow, 'eyeBtn');
+  const eyeBtnText = qs(shadow, 'eyeBtnText');
+  const modeSwitch = qs(shadow, 'modeSwitch');
   const pinDrawer = qs(shadow, 'pinDrawer');
   const pinDrawerClose = qs(shadow, 'pinDrawerClose');
+  const logoIcon = qs(shadow, 'logoIcon');
   const dashboardLink = qs(shadow, 'dashboardLink');
   const shareBtn = qs(shadow, 'shareBtn');
+  const shareBtnText = qs(shadow, 'shareBtnText');
   const shareOverlay = qs(shadow, 'shareOverlay');
   const shareUrlTxt = qs(shadow, 'shareUrlTxt');
   const copyBtn = qs(shadow, 'copyBtn');
@@ -335,7 +632,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   pinsContainer.style.cssText = PINS_CSS;
 
   savedPaddingBottom = document.body.style.paddingBottom || '';
-  document.body.style.paddingBottom = '42px';
+  document.body.style.paddingBottom = '96px';
 
   setMode(initialMode || 'browse');
 
@@ -345,6 +642,13 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
     dashboardLink.addEventListener('click', (e) => {
       chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
         if (res?.dashboardUrl) dashboardLink.href = res.dashboardUrl;
+      });
+    });
+  }
+  if (logoIcon) {
+    logoIcon.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
+        window.open(res?.dashboardUrl || dashboardUrl, '_blank');
       });
     });
   }
@@ -368,8 +672,12 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
     setMode(mode);
     bgMsg({ type: 'MODE_CHANGED', payload: { mode } });
   };
-  if (browseBtn) browseBtn.addEventListener('click', () => switchMode('browse'));
-  if (annotateBtn) annotateBtn.addEventListener('click', () => switchMode('annotate'));
+  if (modeSwitch) {
+    modeSwitch.addEventListener('click', () => {
+      const newMode = currentMode === 'annotate' ? 'browse' : 'annotate';
+      switchMode(newMode);
+    });
+  }
 
   if (eyeBtn) {
     eyeBtn.addEventListener('click', () => {
@@ -378,7 +686,7 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
         pinsContainer.style.display = isPinsVisible ? '' : 'none';
       }
       eyeBtn.classList.toggle('hidden', !isPinsVisible);
-      eyeBtn.textContent = isPinsVisible ? '👁' : '🙈';
+      if (eyeBtnText) eyeBtnText.textContent = isPinsVisible ? 'Hide nikkels' : 'Show nikkels';
     });
   }
 
@@ -394,7 +702,9 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
           try { const u = new URL(n.pageUrl); pageLabel = u.hostname + u.pathname; } catch { pageLabel = n.pageUrl || ''; }
           const text = n.elementText ? `"${n.elementText.slice(0, 60)}"` : '';
           const comment = n.comment ? n.comment.slice(0, 80) : '';
-          return `<div class="pdItem">
+          const x = n.pageX ?? n.x ?? 0;
+          const y = n.pageY ?? n.y ?? 0;
+          return `<div class="pdItem" data-x="${x}" data-y="${y}">
             <span class="pdIdx">${n.idx || '?'}</span>
             <div class="pdBody">
               <span class="pdPage">${pageLabel}</span>
@@ -403,6 +713,14 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
             </div>
           </div>`;
         }).join('');
+        list.querySelectorAll('.pdItem').forEach(el => {
+          el.addEventListener('click', () => {
+            const x = parseInt(el.dataset.x);
+            const y = parseInt(el.dataset.y);
+            window.scrollTo({ left: Math.max(0, x - 200), top: Math.max(0, y - 200), behavior: 'smooth' });
+            pinDrawer.classList.remove('visible');
+          });
+        });
       } else {
         list.innerHTML = '<div id="pinDrawerEmpty">No pins yet</div>';
       }
@@ -436,32 +754,32 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
     shareBtn.addEventListener('click', async () => {
       if (readOnly) {
         shareBtn.disabled = true;
-        shareBtn.textContent = 'Signing in…';
+        if (shareBtnText) shareBtnText.textContent = 'Signing in…';
         const authRes = await chrome.runtime.sendMessage({ type: 'SIGN_IN_GOOGLE' }).catch(() => null);
         if (authRes?.ok) {
           const claimRes = await chrome.runtime.sendMessage({ type: 'CLAIM_PROJECT' }).catch(() => null);
           if (claimRes?.ok) {
             readOnly = false;
-            shareBtn.textContent = '🔗 Share';
+            if (shareBtnText) shareBtnText.textContent = 'Share';
             shareBtn.disabled = false;
             shareBtn.style.opacity = '';
             shareBtn.style.cursor = '';
             return;
           }
-          shareBtn.textContent = claimRes?.error || 'Failed to claim project';
+          if (shareBtnText) shareBtnText.textContent = claimRes?.error || 'Failed to claim project';
         } else {
-          shareBtn.textContent = authRes?.error || 'Sign in failed';
+          if (shareBtnText) shareBtnText.textContent = authRes?.error || 'Sign in failed';
         }
         shareBtn.disabled = false;
-        setTimeout(() => { shareBtn.textContent = '🔗 Login'; }, 3000);
+        setTimeout(() => { if (shareBtnText) shareBtnText.textContent = 'Login'; }, 3000);
         return;
       }
 
       if (pins.length === 0) {
-        shareBtn.textContent = '🔗 No pins yet';
+        if (shareBtnText) shareBtnText.textContent = 'No pins yet';
         shareBtn.style.opacity = '0.6';
         setTimeout(() => {
-          shareBtn.textContent = '🔗 Share';
+          if (shareBtnText) shareBtnText.textContent = 'Share';
           shareBtn.style.opacity = '1';
         }, 2000);
         return;
@@ -491,8 +809,8 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
       if (shareMeta) shareMeta.textContent = shareRes?.error || 'Cannot share right now.';
       if (shareAuthSection) shareAuthSection.style.display = '';
     });
-    if (readOnly) {
-      shareBtn.textContent = '🔗 Login';
+    if (readOnly && shareBtnText) {
+      shareBtnText.textContent = 'Login';
     }
   }
 
@@ -817,8 +1135,8 @@ function addPin(nikkel) {
   pin.dataset.idx = idx;
   pin.dataset.sessionId = nikkel.sessionId || '';
   pin.textContent = idx;
-  const px = (nikkel.pageX || 0) - 13;
-  const py = (nikkel.pageY || 0) - 13;
+  const px = (nikkel.pageX ?? nikkel.x ?? 0) - 13;
+  const py = (nikkel.pageY ?? nikkel.y ?? 0) - 13;
   const pc = pinColor(nikkel.userId);
   pin.style.cssText = `
     position: absolute;
@@ -853,7 +1171,7 @@ function addPin(nikkel) {
   pin.addEventListener('click', (e) => {
     e.stopPropagation();
     removeCommentBubble();
-    injectPopover(nikkel.pageX + 13, nikkel.pageY + 13, nikkel);
+    injectPopover((nikkel.pageX ?? nikkel.x ?? 0) + 13, (nikkel.pageY ?? nikkel.y ?? 0) + 13, nikkel);
   });
   pinsContainer.appendChild(pin);
   pins.push(nikkel);
@@ -959,6 +1277,13 @@ function handleKeydown(e) {
     try { chrome.runtime.sendMessage({ type: 'MODE_CHANGED', payload: { mode: newMode } }); } catch {}
     return;
   }
+  if (e.key === 'd' || e.key === 'D') {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
+      window.open(res?.dashboardUrl || currentDashboardUrl, '_blank');
+    });
+    return;
+  }
   if (e.key === 'Escape') {
     if (commentHost) {
       removeCommentBubble();
@@ -990,18 +1315,28 @@ function setMode(mode) {
   const host = document.getElementById('nikkel-bar-host');
   if (host && host.shadowRoot) {
     const shadow = host.shadowRoot;
-    const modeDot = qs(shadow, 'modeDot');
-    const modeLabel = qs(shadow, 'modeLabel');
-    const browseBtn = qs(shadow, 'browseBtn');
-    const annotateBtn = qs(shadow, 'annotateBtn');
+    const modeSwitch = qs(shadow, 'modeSwitch');
+    const browseLabel = qs(shadow, 'modeBrowseLabel');
+    const annotateLabel = qs(shadow, 'modeAnnotateLabel');
     const inspIdle = qs(shadow, 'inspIdle');
     const inspLive = qs(shadow, 'inspLive');
-    if (modeDot) modeDot.className = mode;
-    if (modeLabel) modeLabel.textContent = mode === 'annotate' ? 'Annotate' : 'Browse';
-    if (browseBtn) browseBtn.className = mode === 'annotate' ? '' : 'active';
-    if (annotateBtn) annotateBtn.className = mode === 'annotate' ? 'active' : '';
-    if (inspIdle) inspIdle.style.display = mode === 'annotate' ? 'none' : '';
-    if (inspLive) inspLive.style.display = mode === 'annotate' ? 'flex' : 'none';
+    if (modeSwitch) {
+      modeSwitch.classList.toggle('on', mode === 'annotate');
+      modeSwitch.classList.toggle('off', mode !== 'annotate');
+      modeSwitch.setAttribute('aria-checked', mode === 'annotate');
+    }
+    if (browseLabel) {
+      const active = mode === 'browse';
+      browseLabel.style.color = active ? '#FFFFFF' : '#CFD1D0';
+      browseLabel.style.fontWeight = active ? '600' : '400';
+    }
+    if (annotateLabel) {
+      const active = mode === 'annotate';
+      annotateLabel.style.color = active ? '#FFFFFF' : '#CFD1D0';
+      annotateLabel.style.fontWeight = active ? '600' : '400';
+    }
+    if (inspIdle) inspIdle.style.display = 'none';
+    if (inspLive) inspLive.style.display = 'none';
   }
   if (mode === 'browse') {
     clearHighlight();
