@@ -28,7 +28,7 @@ const tabState = new Map();
 
 function getTabState(tabId) {
   if (!tabState.has(tabId)) {
-    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '', readOnly: false, barActive: false });
+    tabState.set(tabId, { mode: 'idle', project: null, review: null, nikkels: [], url: '', title: '', readOnly: false, barActive: false, pendingScroll: null });
   }
   return tabState.get(tabId);
 }
@@ -179,6 +179,22 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
           payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
         });
       }
+    } else if (ts.project && globalState.token) {
+      try {
+        const oldOrigin = new URL(ts.project.base_url || ts.project.baseUrl || ts.url).origin;
+        const newOrigin = new URL(changeInfo.url).origin;
+        if (oldOrigin === newOrigin) {
+          ts.mode = 'annotate';
+          ts.nikkels = [];
+          ts.readOnly = false;
+          ts.barActive = true;
+          await saveState();
+          await sendToTab(tabId, {
+            type: 'ACTIVATE',
+            payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+          });
+        }
+      } catch {}
     }
   }
 });
@@ -197,19 +213,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     switch (msg.type) {
       case 'GET_STATE': {
-        let token = globalState.token || '';
-        if (globalState.refreshToken) {
-          try {
-            const { access_token, refresh_token } = await supabaseClient.authRefresh();
-            if (access_token) {
-              token = access_token;
-              supabaseClient.setTokens(access_token, refresh_token || globalState.refreshToken);
-              syncTokens(access_token, refresh_token || globalState.refreshToken);
-              await saveState();
-            }
-          } catch {}
-        }
-        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(token)}` };
+        const token = globalState.token || '';
+        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', userAvatarUrl: globalState.user?.avatarUrl || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(token)}`, nikkelCount: ts?.nikkels?.length || 0 };
       }
 
       case 'START_REVIEW': {
@@ -316,6 +321,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, nikkels };
       }
 
+      case 'NAVIGATE_TO_PIN': {
+        const tId = msg.payload?.tabId || sender.tab?.id;
+        if (!tId) return { ok: false, error: 'No tab' };
+        const ts = getTabState(tId);
+        ts.pendingScroll = { x: msg.payload.x, y: msg.payload.y };
+        chrome.tabs.update(tId, { url: msg.payload.pageUrl });
+        return { ok: true };
+      }
+
+      case 'GET_PENDING_SCROLL': {
+        const tId = msg.payload?.tabId || sender.tab?.id;
+        const ts = tId ? getTabState(tId) : null;
+        const scroll = ts?.pendingScroll || null;
+        if (ts) ts.pendingScroll = null;
+        return { ok: true, scroll };
+      }
+
       case 'GET_NIKKEL_COMMENTS': {
         const { nikkelId } = msg.payload || {};
         if (!nikkelId) return { ok: true, comments: [] };
@@ -379,14 +401,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, token: globalState.token || '' };
       }
 
-      case 'SIGN_IN_GOOGLE': {
+      case 'SIGN_IN_GOOGLE':
+      case 'SIGN_IN_GITHUB': {
+        const provider = msg.type === 'SIGN_IN_GITHUB' ? 'github' : 'google';
         const redirectUrl = chrome.identity.getRedirectURL();
-        const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
+        const extra = provider === 'google' ? '&prompt=select_account' : '';
+        const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}${extra}`;
         let redirect;
         try {
           redirect = await chrome.identity.launchWebAuthFlow({ url: oauthUrl, interactive: true });
         } catch (e) {
-          return { ok: false, error: 'Google sign-in cancelled or failed' };
+          return { ok: false, error: `${provider} sign-in cancelled or failed` };
         }
         if (!redirect) return { ok: false, error: 'No redirect received' };
         const hash = new URL(redirect).hash.substring(1);
@@ -396,8 +421,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!accessToken) return { ok: false, error: 'No access token in response' };
 
         const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${accessToken}` } }).then(r => r.json());
-        const userInfo = { id: userRes.id, email: userRes.email, name: userRes.user_metadata?.full_name || userRes.user_metadata?.name || null };
-        console.log('[BG] SIGN_IN_GOOGLE — Google user info', { id: userInfo.id, email: userInfo.email, name: userInfo.name });
+        const userInfo = { id: userRes.id, email: userRes.email, name: userRes.user_metadata?.full_name || userRes.user_metadata?.name || null, avatarUrl: userRes.user_metadata?.avatar_url || null };
+        console.log(`[BG] ${msg.type} — ${provider} user info`, { id: userInfo.id, email: userInfo.email, name: userInfo.name });
         supabaseClient.setTokens(accessToken, refreshToken);
         setAuthenticatedUser(userInfo, accessToken, refreshToken);
         await upsertProfile(globalState.user, globalState.token);

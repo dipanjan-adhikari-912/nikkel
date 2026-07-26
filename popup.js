@@ -44,11 +44,9 @@ async function init() {
       }
     } catch {}
   }
+  if (!state.title && tab?.title) state.title = tab.title;
 
   console.log('[Popup] GET_STATE', state);
-
-  $('toggleBtn').className = state.globalDisabled ? 'off' : '';
-  $('toggleBtn').textContent = state.globalDisabled ? '⏻' : '⏻';
 
   if (state.globalDisabled) {
     showView('vDisabled');
@@ -63,29 +61,18 @@ async function init() {
       await bg({ type: 'ACTIVATE_TAB', payload: { tabId } });
     }
     showActiveView(state);
+  } else if (state.user && state.userEmail) {
+    showReady(state);
   } else {
-    showWelcomeView(state);
+    showSignIn();
   }
 }
 
-$('toggleBtn').addEventListener('click', async () => {
-  const tab = await getActiveTab();
-  const tabId = tab?.id;
-  const state = await bg({ type: 'GET_STATE', payload: { tabId } });
-  const res = await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: !state.globalDisabled, tabId } });
-  if (res.ok) init();
-});
-
-$('enableBtn').addEventListener('click', async () => {
+$('powerBtn').addEventListener('click', async () => {
   const tab = await getActiveTab();
   await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: false, tabId: tab?.id } });
   init();
 });
-
-function showWelcomeView(state) {
-  showView('vWelcome');
-  $('resetLink').style.display = state.user ? 'block' : 'none';
-}
 
 function showShareUrl(url) {
   const shareSection = $('shareSection');
@@ -121,79 +108,118 @@ function updateUserRow(state) {
   $('userAvatar').textContent = state.userName ? state.userName[0].toUpperCase() : 'U';
 }
 
-function showAuthForm() {
+function showSignIn() {
   showView('vAuth');
   $('userRow').classList.remove('show');
-  $('authForm').innerHTML = `
-    <div class="auth-title">Sign in</div>
-    <div id="authError" style="display:none;background:#7f1d1d;color:#fecaca;padding:6px 12px;font-size:12px;border-radius:4px;margin-bottom:10px"></div>
-    <button class="btn btn-google" id="authGoogleBtn">
-      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
-      Sign in with Google
-    </button>
-    <div class="sep"></div>
-    <span class="link" id="authBack">Back</span>
-  `;
-    $('authGoogleBtn').addEventListener('click', async () => {
-      $('authGoogleBtn').disabled = true; $('authGoogleBtn').textContent = 'Connecting…';
-      const tab = await getActiveTab();
-      const res = await bg({ type: 'SIGN_IN_GOOGLE', payload: { tabId: tab?.id } });
-      if (res.ok) { init(); }
-      else { showError(res.error || 'Google sign-in failed.'); $('authGoogleBtn').disabled = false; $('authGoogleBtn').innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.54 28.59A14.5 14.5 0 0 1 9.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 0 0 0 24c0 3.77.87 7.35 2.56 10.56l7.98-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg> Sign in with Google'; }
-    });
-  $('authBack').addEventListener('click', () => init());
+}
+
+$('signinGoogleBtn').addEventListener('click', async () => {
+  $('signinGoogleBtn').style.pointerEvents = 'none';
+  $('signinGoogleBtn').style.opacity = '.7';
+  const tab = await getActiveTab();
+  const res = await bg({ type: 'SIGN_IN_GOOGLE', payload: { tabId: tab?.id } });
+  $('signinGoogleBtn').style.pointerEvents = '';
+  $('signinGoogleBtn').style.opacity = '';
+  if (res.ok) { init(); }
+  else { showError(res.error || 'Sign-in failed.'); }
+});
+
+function showReady(state) {
+  showView('vReady');
+  $('userRow').classList.remove('show');
+  const avatar = $('vauthAvatar');
+  if (state.userAvatarUrl) { avatar.style.backgroundImage = `url(${state.userAvatarUrl})`; avatar.textContent = ''; }
+  else { avatar.style.backgroundImage = ''; const parts = (state.userName || '').split(' '); avatar.textContent = (parts[0]?.[0] || '') + (parts[1]?.[0] || ''); }
+  $('vauthName').textContent = state.userName || 'User';
+  $('vauthEmail').textContent = state.userEmail || '';
+  $('vauthWebsite').textContent = state.title || '';
+  try { $('vauthFavicon').src = `https://www.google.com/s2/favicons?domain=${new URL(state.url).hostname}&sz=16`; } catch { $('vauthFavicon').style.display = 'none'; }
+
+  $('vauthStartBtn').onclick = async () => {
+    $('vauthStartBtn').disabled = true;
+    $('vauthStartBtn').textContent = 'Starting…';
+    const tab = await getActiveTab();
+    if (!tab) { showError('No active tab found.'); $('vauthStartBtn').disabled = false; $('vauthStartBtn').textContent = 'Start Review'; return; }
+    const res = await bg({ type: 'START_REVIEW', payload: { tabId: tab.id, title: tab.title, url: tab.url } });
+    if (res.ok) { window.close(); }
+    else { showError(res.error || 'Failed to start review.'); $('vauthStartBtn').disabled = false; $('vauthStartBtn').textContent = 'Start Review'; }
+  };
+
+  $('vauthDashboardBtn').onclick = async () => {
+    const tab = await getActiveTab();
+    const s = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
+    const url = s?.dashboardUrl || `https://nikkel-alpha.vercel.app/dashboard`;
+    chrome.tabs.create({ url });
+  };
+
+  $('vauthSignOut').onclick = async () => {
+    await bg({ type: 'SIGN_OUT' });
+    init();
+  };
 }
 
 function showActiveView(state) {
-  console.log('[Popup] showActiveView', { project: state.project?.id, user: state.user?.id, url: state.url, title: state.title });
-  showView('vActive');
-  const p = state.project;
-  $('activeProjectName').textContent = state.title || p.title || 'Untitled Review';
-  $('activeProjectUrl').textContent = state.url || p.base_url || '';
+  showView('vReview');
+  $('userRow').classList.remove('show');
+  const avatar = $('reviewAvatar');
+  if (state.userAvatarUrl) { avatar.style.backgroundImage = `url(${state.userAvatarUrl})`; avatar.textContent = ''; }
+  else { avatar.style.backgroundImage = ''; const parts = (state.userName || '').split(' '); avatar.textContent = (parts[0]?.[0] || '') + (parts[1]?.[0] || ''); }
+  $('reviewName').textContent = state.userName || 'User';
+  $('reviewEmail').textContent = state.userEmail || '';
+  $('reviewWebsite').textContent = state.title || '';
+  try { $('reviewFavicon').src = `https://www.google.com/s2/favicons?domain=${new URL(state.url).hostname}&sz=16`; } catch { $('reviewFavicon').style.display = 'none'; }
+  $('reviewBadge').textContent = state.nikkelCount || 0;
+  $('reviewShareSection').innerHTML = '';
+  $('reviewCard').style.display = '';
 
-  const shareSection = $('shareSection');
-  if (state.user) {
-    shareSection.innerHTML = `
-      <div class="share-box">
-        <button class="btn btn-sm" id="generateShareBtn">Generate share link</button>
-      </div>`;
-    const gen = shareSection.querySelector('#generateShareBtn');
-    if (gen) {
-      gen.addEventListener('click', async () => {
-        gen.disabled = true;
-        gen.textContent = 'Generating…';
-        const tab = await getActiveTab();
-        const res = await bg({ type: 'SHARE', payload: { tabId: tab?.id } });
-        if (res.ok && res.shareUrl) {
-          showShareUrl(res.shareUrl);
-        } else {
-          gen.disabled = false;
-          gen.textContent = 'Generate share link';
-          showError(res.error || 'Failed to generate link.');
-        }
-      });
+  $('reviewSignOut').onclick = async () => {
+    await bg({ type: 'SIGN_OUT' });
+    init();
+  };
+
+  $('reviewDashboardBtn').onclick = async () => {
+    const tab = await getActiveTab();
+    const s = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
+    const url = s?.dashboardUrl || `https://nikkel-alpha.vercel.app/dashboard`;
+    chrome.tabs.create({ url });
+  };
+
+  $('reviewShareBtn').onclick = async () => {
+    $('reviewShareBtn').disabled = true;
+    $('reviewShareBtn').textContent = 'Generating…';
+    const tab = await getActiveTab();
+    const res = await bg({ type: 'SHARE', payload: { tabId: tab?.id } });
+    if (res.ok && res.shareUrl) {
+      $('reviewCard').style.display = 'none';
+      showReviewShareUrl(res.shareUrl);
+    } else {
+      $('reviewShareBtn').disabled = false;
+      $('reviewShareBtn').textContent = 'Share link';
+      showError(res.error || 'Failed to generate link.');
     }
-  } else {
-    shareSection.innerHTML = `
-      <div class="share-box">
-        <div class="share-msg">Sign in with Google to share this review with your name attached.</div>
-      </div>`;
-  }
+  };
 }
 
-$('startReviewBtn').addEventListener('click', async () => {
-  clearError();
-  const tab = await getActiveTab();
-  if (!tab) { showError('No active tab found.'); return; }
-  const state = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
-  if (!state.user || !state.userEmail) { showAuthForm(); return; }
-  const res = await bg({ type: 'START_REVIEW', payload: { tabId: tab.id, title: tab.title, url: tab.url } });
-  if (res.ok) {
-    window.close();
-  } else {
-    showError(res.error || 'Failed to start review.');
+function showReviewShareUrl(url) {
+  const section = $('reviewShareSection');
+  section.innerHTML = `
+    <div class="share-box">
+      <input value="${url}" readonly id="reviewShareUrlInput" />
+      <button class="btn btn-sm" id="reviewCopyShareBtn">Copy share link</button>
+    </div>`;
+  const inp = section.querySelector('#reviewShareUrlInput');
+  if (inp) inp.addEventListener('click', () => inp.select());
+  const cb = section.querySelector('#reviewCopyShareBtn');
+  if (cb) {
+    cb.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        cb.textContent = 'Copied!';
+        setTimeout(() => { cb.textContent = 'Copy share link'; }, 1500);
+      } catch {}
+    });
   }
-});
+}
 
 $('stopReviewBtn').addEventListener('click', async () => {
   clearError();
@@ -201,7 +227,7 @@ $('stopReviewBtn').addEventListener('click', async () => {
   await bg({ type: 'STOP_REVIEW', payload: { tabId: tab?.id } });
   const s = await bg({ type: 'GET_STATE', payload: { tabId: tab?.id } });
   updateUserRow(s);
-  showWelcomeView(s);
+  showReady(s);
 });
 
 $('shareBtn').addEventListener('click', async () => {
@@ -215,12 +241,6 @@ $('shareBtn').addEventListener('click', async () => {
   } else {
     showError(res.error || 'Failed to generate share link.');
   }
-});
-
-$('resetLink').addEventListener('click', async () => {
-  await bg({ type: 'SIGN_OUT' });
-  updateUserRow({ user: null });
-  showWelcomeView({});
 });
 
 $('signOutLink').addEventListener('click', async () => {

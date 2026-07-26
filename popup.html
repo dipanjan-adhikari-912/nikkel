@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Josefin+Sans:wght@100..700&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; background: #0f172a; color: #e2e8f0; }
+    body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; background: #0f172a; color: #e2e8f0; border-radius: 12px; overflow: hidden; }
     .view { display: none; padding: 20px; }
     .view.active { display: block; }
-    .icon { font-size: 32px; text-align: center; margin-bottom: 8px; }
     h2 { font-size: 17px; font-weight: 600; text-align: center; margin-bottom: 4px; }
     .sub { color: #64748b; text-align: center; font-size: 13px; margin-bottom: 16px; line-height: 1.4; }
     .btn { display: block; background: #6366f1; color: #fff; border: none; border-radius: 6px; padding: 10px; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; text-align: center; }
@@ -15,8 +17,7 @@
     .btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
     .btn-outline:hover { background: #1e293b; color: #e2e8f0; }
     .btn-sm { padding: 6px 12px; font-size: 12px; }
-    .btn-google { background: #fff; color: #1e293b; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .btn-google:hover { background: #f1f5f9; }
+    .btn-google, .btn-github { display: none; }
     .link { color: #6366f1; cursor: pointer; font-size: 12px; }
     .link:hover { text-decoration: underline; }
     .sep { height: 1px; background: #1e293b; margin: 12px 0; }
@@ -28,9 +29,7 @@
     .share-msg { text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.4; padding: 8px 0; }
     .action-row { display: flex; gap: 6px; }
     .action-row .btn { flex: 1; }
-    #toggleRow { display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; border-bottom: 1px solid #1e293b; font-size: 12px; color: #64748b; }
-    #toggleBtn { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 4px; color: #6366f1; }
-    #toggleBtn.off { color: #475569; }
+
     #userRow { display: none; align-items: center; gap: 8px; padding: 8px 20px; border-bottom: 1px solid #1e293b; font-size: 12px; }
     #userRow.show { display: flex; }
     #userAvatar { width: 24px; height: 24px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #94a3b8; flex-shrink: 0; }
@@ -43,23 +42,69 @@
     #authRow { display: none; }
     #userActions { display: flex; gap: 4px; align-items: center; }
     #userActions .link { font-size: 11px; }
-    .auth-title { font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 16px; }
-    .disabled-msg { text-align: center; padding: 40px 20px; color: #64748b; }
-    .disabled-msg .icon { font-size: 32px; margin-bottom: 8px; }
-    .disabled-msg h2 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #e2e8f0; }
-    .disabled-msg p { font-size: 13px; line-height: 1.4; margin-bottom: 16px; }
+    /* Sign-in prompt */
+    #vAuth { background: #101715; padding: 48px 28px; }
+    #vAuth.view.active { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+    .signin-logo { width: 90px; height: 90px; background: #fff; border-radius: 4px; flex-shrink: 0; }
+    .signin-title { font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 24px; font-weight: 600; color: #ddf3ec; text-align: center; letter-spacing: -0.48px; }
+    .signin-desc { font-family: 'Inter', system-ui, sans-serif; font-size: 15px; line-height: 22px; text-align: center; background: linear-gradient(#82b0a0, #82b0a0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .signin-google-btn { background: #71b9a1; color: #101715; border: none; border-radius: 14px; padding: 14px 20px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 16px; font-weight: 500; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .signin-google-btn:hover { background: #7fc4ac; }
+    .signin-google-btn:disabled { opacity: .7; cursor: default; }
+
+    /* Signed-in landing */
+    #vReady { background: #101715; padding: 28px 20px; }
+    #vReady.view.active { display: flex; flex-direction: column; gap: 20px; }
+    .vauth-user { display: flex; align-items: center; gap: 12px; }
+    .vauth-avatar { width: 40px; height: 40px; border-radius: 4px; flex-shrink: 0; background: #d9d9d9; display: flex; align-items: center; justify-content: center; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 16px; font-weight: 600; color: #101715; background-size: cover; background-position: center; }
+    .vauth-user-info { flex: 1; min-width: 0; }
+    .vauth-name { font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 16px; font-weight: 600; color: #ddf3ec; letter-spacing: -0.32px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vauth-email { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; background: linear-gradient(#82b0a0, #82b0a0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vauth-dashboard-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .vauth-dashboard-btn:hover { background: #1b2723; }
+    .vauth-divider { height: 1px; background: #82b0a033; }
+    .vauth-website { display: flex; align-items: center; gap: 8px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; font-weight: 500; color: #ddf3ec; }
+    .vauth-favicon { width: 16px; height: 16px; border-radius: 2px; flex-shrink: 0; }
+    .vauth-website-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vauth-card { background: #1b2723; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    .vauth-card-content { display: flex; gap: 12px; align-items: flex-start; }
+    .vauth-pin-icon { width: 47px; height: 48px; flex-shrink: 0; position: relative; }
+    .vauth-card-text { flex: 1; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 13px; line-height: 18px; color: #82b0a0; letter-spacing: -0.26px; }
+    .vauth-start-btn { background: #71b9a1; color: #1b2723; border: none; border-radius: 8px; padding: 10px 12px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; text-align: center; }
+    .vauth-start-btn:hover { background: #7fc4ac; }
+    .vauth-signout { display: flex; align-items: center; gap: 8px; cursor: pointer; align-self: flex-end; }
+    .vauth-signout:hover { opacity: .8; }
+    .vauth-signout-text { font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 14px; color: #82b0a0; font-weight: 500; }
+    .vauth-power-icon { width: 19.2px; height: 19.2px; display: flex; align-items: center; justify-content: center; overflow: visible; }
+    /* Review active view */
+    #vReview { background: #101715; padding: 28px 20px; }
+    #vReview.view.active { display: flex; flex-direction: column; gap: 20px; }
+    .review-card { background: #1b2723; border-radius: 14px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+    .review-counter { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+    .review-badge { width: 28px; height: 28px; border-radius: 50%; background: #71b9a1; display: flex; align-items: center; justify-content: center; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #1b2723; flex-shrink: 0; }
+    .review-badge-text { font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: #ddf3ec; white-space: nowrap; }
+    .review-share-btn { background: #ddf3ec; color: #1b2723; border: none; border-radius: 6px; padding: 8px 12px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .review-share-btn:hover { background: #cce8df; }
     .session-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; background: #1e293b; margin-bottom: 4px; transition: background .15s; }
     .session-item:hover { background: #334155; }
     .resume-btn { flex-shrink: 0; padding: 3px 8px; font-size: 11px; }
+
+    /* Disabled view */
+    #vDisabled { background: #101715; padding: 48px 20px; }
+    #powerBtn { transition: filter .2s ease; cursor: pointer; }
+    #powerBtn:hover { filter: brightness(.85); }
+    .disabled-icon-wrap { display: flex; justify-content: center; margin-bottom: 36px; }
+    .disabled-icon-outer { width: 140px; height: 140px; position: relative; }
+    .disabled-icon-inner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .disabled-title { font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 24px; font-weight: 600; color: #ddf3ec; text-align: center; letter-spacing: -0.48px; margin-top: 24px; margin-bottom: 12px; }
+    .disabled-desc { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 24px; text-align: center; background: linear-gradient(#82b0a0, #82b0a0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 24px; }
+    #enableBtn { background: #71b9a1; color: #101715; border-radius: 8px; font-weight: 600; }
+    #enableBtn:hover { background: #7fc4ac; }
   </style>
 </head>
 <body>
   <div id="globalError"></div>
 
-  <div id="toggleRow">
-    <span>Nikkel</span>
-    <button id="toggleBtn" title="Toggle extension">⏻</button>
-  </div>
 
   <div id="userRow">
     <div id="userAvatar">👤</div>
@@ -75,25 +120,70 @@
   </div>
 
   <div id="vAuth" class="view">
-    <div id="authForm"></div>
-  </div>
-
-  <div id="vDisabled" class="view">
-    <div class="disabled-msg">
-      <div class="icon">🔌</div>
-      <h2>Nikkel is off</h2>
-      <p>The extension is disabled. Enable it to start reviewing websites.</p>
-      <button class="btn" id="enableBtn">Enable Nikkel</button>
+    <div class="signin-logo"></div>
+    <div class="signin-title">Welcome to nikkel</div>
+    <div class="signin-desc">Sign-in with your Google Account to begin reviewing</div>
+    <div class="signin-google-btn" id="signinGoogleBtn">
+      <svg width="28" height="28" viewBox="-5.96e-8 0 19.6 20" fill="none"><path d="M1.0640007 5.5100002C1.8963751 3.8535349 3.1728225 2.461056 4.7507997 1.4880643C6.3287768 0.51507264 8.1461601 -0.00012648696 10.000001 2.3293406e-08C12.695001 2.3293405e-08 14.959001 0.99100006 16.690001 2.605L13.823001 5.473C12.786001 4.4819999 11.468001 3.9770002 10.000001 3.9770002C7.3950009 3.9770002 5.190001 5.7370005 4.4050012 8.1000004C4.2050014 8.7000008 4.091001 9.3400002 4.091001 10C4.091001 10.66 4.2050014 11.299999 4.4050012 11.9C5.1910009 14.264 7.3950009 16.023001 10.000001 16.023001C11.345001 16.023001 12.490001 15.668001 13.386001 15.068001C13.905438 14.726003 14.350132 14.282226 14.693202 13.763495C15.036272 13.244765 15.270594 12.661855 15.382001 12.05L10.000001 12.05L10.000001 8.1820002L19.417999 8.1820002C19.535999 8.8360004 19.6 9.5180006 19.6 10.227C19.6 13.273001 18.51 15.837 16.618 17.577C14.964 19.105 12.700001 20 10.000001 20C8.6866341 20.000526 7.3860378 19.742228 6.1725445 19.239866C4.9590511 18.737505 3.8564508 18.000931 2.9277604 17.072241C1.9990699 16.143551 1.2624955 15.04095 0.76013476 13.827456C0.25777394 12.613963 -0.00052486139 11.313367 8.0071436e-07 10C8.0071436e-07 8.3859997 0.38600075 6.8600001 1.0640007 5.5100002Z" fill="#101715"/></svg>
+      Sign in with Google
     </div>
   </div>
 
-  <div id="vWelcome" class="view active">
-    <div class="icon">📌</div>
-    <h2>Welcome to Nikkel</h2>
-    <p class="sub">Review this website directly.<br />Drop pins, leave comments, share feedback.</p>
-    <button class="btn" id="startReviewBtn">▶ Start Review</button>
-    <div class="sep"></div>
-    <span class="link" id="resetLink" style="display:none">Reset session</span>
+  <div id="vReady" class="view">
+    <div class="vauth-user">
+      <div class="vauth-avatar" id="vauthAvatar"></div>
+      <div class="vauth-user-info">
+        <div class="vauth-name" id="vauthName"></div>
+        <div class="vauth-email" id="vauthEmail"></div>
+      </div>
+      <div class="vauth-dashboard-btn" id="vauthDashboardBtn">
+        <svg width="18" height="20" viewBox="-0.5 -0.5 17 19" fill="none"><path d="M4.4 0H1.6C1.17565 0 0.768688 0.168571 0.468629 0.468629C0.168571 0.768687 0 1.17565 0 1.6V6.4C0 6.61011 0.0413853 6.81817 0.121793 7.01229C0.2022 7.20641 0.320056 7.3828 0.468629 7.53137C0.617203 7.67994 0.793586 7.7978 0.987707 7.87821C1.18183 7.95861 1.38988 8 1.6 8H4.4C4.61011 8 4.81817 7.95861 5.01229 7.87821C5.20641 7.7978 5.3828 7.67994 5.53137 7.53137C5.67994 7.3828 5.7978 7.20641 5.87821 7.01229C5.95861 6.81817 6 6.61011 6 6.4V1.6C6 1.17565 5.83143 0.768687 5.53137 0.468629C5.23131 0.168571 4.82435 0 4.4 0ZM4.4 12H1.6C1.17565 12 0.768688 12.1686 0.468629 12.4686C0.168571 12.7687 0 13.1757 0 13.6V16.4C0 16.8243 0.168571 17.2313 0.468629 17.5314C0.768688 17.8314 1.17565 18 1.6 18H4.4C4.82435 18 5.23131 17.8314 5.53137 17.5314C5.83143 17.2313 6 16.8243 6 16.4V13.6C6 13.1757 5.83143 12.7687 5.53137 12.4686C5.23131 12.1686 4.82435 12 4.4 12ZM14.4 0H11.6C11.1757 0 10.7687 0.168571 10.4686 0.468629C10.1686 0.768687 10 1.17565 10 1.6V4.4C10 4.82435 10.1686 5.23131 10.4686 5.53137C10.7687 5.83143 11.1757 6 11.6 6H14.4C14.8243 6 15.2313 5.83143 15.5314 5.53137C15.8314 5.23131 16 4.82435 16 4.4V1.6C16 1.17565 15.8314 0.768687 15.5314 0.468629C15.2313 0.168571 14.8243 0 14.4 0ZM14.4 10H11.6C11.1757 10 10.7687 10.1686 10.4686 10.4686C10.1686 10.7687 10 11.1757 10 11.6V16.4C10 16.8243 10.1686 17.2313 10.4686 17.5314C10.7687 17.8314 11.1757 18 11.6 18H14.4C14.8243 18 15.2313 17.8314 15.5314 17.5314C15.8314 17.2313 16 16.8243 16 16.4V11.6C16 11.1757 15.8314 10.7687 15.5314 10.4686C15.2313 10.1686 14.8243 10 14.4 10Z" stroke="#82b0a0" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <div class="vauth-divider"></div>
+    <div class="vauth-website"><img class="vauth-favicon" id="vauthFavicon" alt=""/><span class="vauth-website-text" id="vauthWebsite"></span></div>
+    <div class="vauth-card">
+      <div class="vauth-card-content">
+        <div class="vauth-pin-icon">
+          <svg width="47" height="48" viewBox="0 0 47 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0;top:0"><circle cx="16.5" cy="16.5" r="16.5" fill="#82B0A0"/><path d="M18.1416 19.1421H18.1426L18.1475 19.1362C18.2181 19.0644 18.31 19.0171 18.4092 18.9995C18.5083 18.982 18.6102 18.9955 18.7012 19.0386L18.707 19.0415L40.6299 29.272V29.2983L41.2217 29.563C41.3973 29.6416 41.5119 29.8178 41.501 30.0415C41.4926 30.2123 41.3946 30.3662 41.2354 30.4468L41.1641 30.4761L32.8691 33.2358L32.3945 33.394L32.2363 33.8696L29.4766 42.1636C29.4104 42.362 29.2408 42.4881 29.0488 42.5005H29C28.8166 42.5005 28.6302 42.3906 28.5342 42.1929L18.041 19.7075L18.0391 19.7017L18.0117 19.6323C17.9624 19.4656 18.0055 19.2783 18.1416 19.1421Z" fill="#DDF3EC" stroke="#1B2723" stroke-width="2"/></svg>
+        </div>
+        <div class="vauth-card-text">Website ready for review.<br/>Drop nikkels, add comments, share it ahead.</div>
+      </div>
+      <button class="vauth-start-btn" id="vauthStartBtn">Start Review</button>
+    </div>
+    <div class="vauth-signout" id="vauthSignOut">
+      <span class="vauth-signout-text">Sign out</span>
+      <div class="vauth-power-icon">
+        <svg viewBox="-1 -1 17.5 18.5" fill="none" style="width:100%;height:100%"><path d="M2.75 2C1.53639 3.02477 0.666966 4.39771 0.259429 5.93294C-0.148108 7.46817 -0.074076 9.09155 0.471504 10.5833C1.01708 12.0751 2.00786 13.3632 3.30971 14.2732C4.61156 15.1833 6.1616 15.6714 7.75 15.6714C9.3384 15.6714 10.8884 15.1833 12.1903 14.2732C13.4921 13.3632 14.4829 12.0751 15.0285 10.5833C15.5741 9.09155 15.6481 7.46817 15.2406 5.93294C14.833 4.39771 13.9636 3.02477 12.75 2M7.75 8V0" stroke="#82b0a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div id="vDisabled" class="view">
+    <div class="disabled-icon-wrap" id="powerBtn" style="width:140px;height:140px;margin:0 auto;position:relative;cursor:pointer">
+      <svg viewBox="0 0 223 223" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0;top:0;width:140px;height:140px;overflow:visible">
+        <defs>
+          <radialGradient id="power-fill" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1" gradientTransform="matrix(-78.842 -78.842 78.842 -78.842 111.5 111.5)">
+            <stop offset="15.855%" stop-color="rgb(29,42,38)"/>
+            <stop offset="15.865%" stop-color="rgb(29,42,38)"/>
+            <stop offset="88.942%" stop-color="rgb(16,23,21)"/>
+          </radialGradient>
+          <linearGradient id="power-stroke" gradientUnits="userSpaceOnUse" x1="111.5" y1="0" x2="111.5" y2="223">
+            <stop offset="0%" stop-color="rgb(40,67,59)"/>
+            <stop offset="100%" stop-color="rgb(28,40,36)"/>
+          </linearGradient>
+        </defs>
+        <path d="M223 111.5q0 2.73717-0.13431 5.47105-0.13431 2.73388-0.4026 5.45787-0.2683 2.72399-0.66991 5.43153-0.40164 2.70754-0.93564 5.39211-0.53399 2.68457-1.19908 5.33973-0.66508 2.65515-1.45962 5.27445-0.79457 2.61931-1.71669 5.19648-0.92212 2.57716-1.96961 5.10597-1.04747 2.52881-2.21774 5.00319-1.1703 2.47438-2.46059 4.88835-1.2903 2.41397-2.69749 4.76172-1.40718 2.34775-2.92787 4.62363-1.52068 2.27587-3.1512 4.47439-1.63054 2.19852-3.36698 4.31439-1.73645 2.11586-3.57463 4.14397-1.83816 2.02811-3.77363 3.96358-1.93547 1.93547-3.96358 3.77365-2.02811 1.83816-4.14397 3.57461-2.11587 1.73644-4.31439 3.36696-2.19852 1.63054-4.47439 3.15122-2.27588 1.52069-4.62363 2.92787-2.34775 1.40719-4.76172 2.69749-2.41397 1.2903-4.88835 2.46059-2.47438 1.17029-5.00319 2.21776-2.52881 1.04747-5.10597 1.96959-2.57717 0.92212-5.19648 1.71669-2.6193 0.79454-5.27445 1.45961-2.65516 0.6651-5.33973 1.19909-2.68457 0.534-5.39212 0.93564-2.70753 0.40163-5.43152 0.66992-2.72399 0.26828-5.45787 0.40259-2.73388 0.13431-5.47105 0.13431-2.73717 0-5.47105-0.13431-2.73388-0.13431-5.45787-0.4026-2.72399-0.2683-5.43153-0.66991-2.70755-0.40164-5.39213-0.93564-2.68458-0.53399-5.33972-1.19908-2.65514-0.66508-5.27444-1.45962-2.61931-0.79457-5.19649-1.71669-2.57716-0.92212-5.10598-1.96961-2.52882-1.04747-5.00318-2.21774-2.47437-1.1703-4.88834-2.46059-2.41397-1.2903-4.76173-2.69749-2.34775-1.40718-4.62362-2.92787-2.27587-1.52068-4.4744-3.1512-2.19851-1.63054-4.31437-3.36698-2.11586-1.73645-4.14397-3.57463-2.02811-1.83816-3.96359-3.77363-1.93548-1.93547-3.77364-3.96358-1.83817-2.02811-3.57462-4.14397-1.73644-2.11587-3.36697-4.31439-1.63053-2.19852-3.15122-4.47439-1.52069-2.27588-2.92788-4.62363-1.40719-2.34775-2.69748-4.76172-1.2903-2.41397-2.46059-4.88835-1.17029-2.47438-2.21776-5.00319-1.04747-2.52881-1.96959-5.10597-0.92213-2.57717-1.71669-5.19648-0.79456-2.6193-1.45963-5.27445-0.66508-2.65516-1.19908-5.33973-0.534-2.68457-0.93562-5.39212-0.40163-2.70753-0.66992-5.43152-0.26829-2.72399-0.40259-5.45787-0.13431-2.73388-0.13431-5.47105 0-2.73717 0.13431-5.47105 0.13431-2.73388 0.40259-5.45787 0.26829-2.72399 0.66992-5.43153 0.40163-2.70755 0.93562-5.39213 0.534-2.68458 1.19907-5.33972 0.66508-2.65514 1.45964-5.27444 0.79456-2.61931 1.71669-5.19649 0.92213-2.57716 1.96959-5.10598 1.04747-2.52882 2.21776-5.00318 1.17029-2.47437 2.46059-4.88834 1.29029-2.41397 2.69748-4.76173 1.40719-2.34775 2.92788-4.62362 1.52069-2.27587 3.15122-4.4744 1.63053-2.19851 3.36697-4.31437 1.73644-2.11586 3.57462-4.14397 1.83817-2.02811 3.77364-3.96359 1.93547-1.93548 3.96359-3.77364 2.02811-1.83817 4.14397-3.57462 2.11586-1.73644 4.31438-3.36697 2.19851-1.63053 4.47439-3.15122 2.27587-1.52069 4.62362-2.92788 2.34775-1.40719 4.76173-2.69748 2.41397-1.2903 4.88834-2.46059 2.47437-1.17029 5.00318-2.21776 2.52882-1.04747 5.10598-1.96959 2.57717-0.92213 5.19649-1.71669 2.61931-0.79456 5.27445-1.45963 2.65514-0.66508 5.33972-1.19908 2.68458-0.534 5.39213-0.93562 2.70754-0.40163 5.43153-0.66992 2.72398-0.26829 5.45786-0.40259 2.73388-0.13431 5.47105-0.13431 2.73717 0 5.47105 0.13431 2.73388 0.13431 5.45787 0.40259 2.72399 0.26829 5.43153 0.66992 2.70754 0.40163 5.39211 0.93562 2.68457 0.534 5.33973 1.19907 2.65515 0.66508 5.27445 1.45964 2.61931 0.79456 5.19648 1.71669 2.57716 0.92213 5.10597 1.96959 2.52881 1.04747 5.00319 2.21776 2.47438 1.17029 4.88835 2.46059 2.41397 1.29029 4.76172 2.69748 2.34775 1.40719 4.62363 2.92788 2.27587 1.52069 4.47439 3.15122 2.19852 1.63053 4.31439 3.36697 2.11586 1.73644 4.14397 3.57462 2.02811 1.83817 3.96358 3.77364 1.93547 1.93547 3.77365 3.96359 1.83816 2.02811 3.57461 4.14397 1.73644 2.11586 3.36696 4.31438 1.63054 2.19851 3.15122 4.47439 1.52069 2.27587 2.92787 4.62362 1.40719 2.34775 2.69749 4.76173 1.2903 2.41397 2.46059 4.88834 1.17029 2.47437 2.21776 5.00318 1.04747 2.52882 1.96959 5.10598 0.92212 2.57717 1.71669 5.19649 0.79454 2.61931 1.45961 5.27445 0.6651 2.65514 1.19909 5.33972 0.534 2.68458 0.93564 5.39213 0.40163 2.70754 0.66992 5.43153 0.26828 2.72398 0.40259 5.45786 0.13431 2.73388 0.13431 5.47105z" fill="url(#power-fill)"></path>
+        <path d="M111.5 223q2.73717 0 5.47105-0.13431 2.73388-0.13431 5.45787-0.4026 2.72399-0.2683 5.43153-0.66991 2.70754-0.40164 5.39211-0.93564 2.68457-0.53399 5.33973-1.19908 2.65515-0.66508 5.27445-1.45962 2.61931-0.79457 5.19648-1.71669 2.57716-0.92212 5.10597-1.96961 2.52881-1.04747 5.00319-2.21774 2.47438-1.1703 4.88835-2.46059 2.41397-1.2903 4.76172-2.69749 2.34775-1.40718 4.62363-2.92787 2.27587-1.52068 4.47439-3.1512 2.19852-1.63054 4.31439-3.36698 2.11586-1.73645 4.14397-3.57463 2.02811-1.83816 3.96358-3.77363 1.93547-1.93547 3.77365-3.96358 1.83816-2.02811 3.57461-4.14397 1.73644-2.11587 3.36696-4.31439 1.63054-2.19852 3.15122-4.47439 1.52069-2.27588 2.92787-4.62363 1.40719-2.34775 2.69749-4.76172 1.2903-2.41397 2.46059-4.88835 1.17029-2.47438 2.21776-5.00319 1.04747-2.52881 1.96959-5.10597 0.92212-2.57717 1.71669-5.19648 0.79454-2.6193 1.45961-5.27445 0.6651-2.65516 1.19909-5.33973 0.534-2.68457 0.93564-5.39212 0.40163-2.70753 0.66992-5.43152 0.26828-2.72399 0.40259-5.45787 0.13431-2.73388 0.13431-5.47105 0-2.73717-0.13431-5.47105-0.13431-2.73388-0.4026-5.45787-0.2683-2.72399-0.66991-5.43153-0.40164-2.70755-0.93564-5.39213-0.53399-2.68458-1.19908-5.33972-0.66508-2.65514-1.45962-5.27444-0.79457-2.61931-1.71669-5.19649-0.92212-2.57716-1.96961-5.10598-1.04747-2.52882-2.21774-5.00318-1.1703-2.47437-2.46059-4.88834-1.2903-2.41397-2.69749-4.76173-1.40718-2.34775-2.92787-4.62362-1.52068-2.27587-3.1512-4.4744-1.63054-2.19851-3.36698-4.31437-1.73645-2.11586-3.57463-4.14397-1.83816-2.02811-3.77363-3.96359-1.93547-1.93548-3.96358-3.77364-2.02811-1.83817-4.14397-3.57462-2.11587-1.73644-4.31439-3.36697-2.19852-1.63053-4.47439-3.15122-2.27588-1.52069-4.62363-2.92788-2.34775-1.40719-4.76172-2.69748-2.41397-1.2903-4.88835-2.46059-2.47438-1.17029-5.00319-2.21776-2.52881-1.04747-5.10597-1.96959-2.57717-0.92213-5.19648-1.71669-2.6193-0.79456-5.27445-1.45963-2.65516-0.66508-5.33973-1.19908-2.68457-0.534-5.39212-0.93562-2.70753-0.40163-5.43152-0.66992-2.72399-0.26829-5.45787-0.40259-2.73388-0.13431-5.47105-0.13431-2.73717 0-5.47105 0.13431-2.73388 0.13431-5.45787 0.40259-2.72399 0.26829-5.43153 0.66992-2.70755 0.40163-5.39213 0.93562-2.68458 0.534-5.33972 1.19907-2.65514 0.66508-5.27444 1.45964-2.61931 0.79456-5.19649 1.71669-2.57716 0.92213-5.10598 1.96959-2.52882 1.04747-5.00318 2.21776-2.47437 1.17029-4.88834 2.46059-2.41397 1.29029-4.76173 2.69748-2.34775 1.40719-4.62362 2.92788-2.27587 1.52069-4.4744 3.15122-2.19851 1.63053-4.31437 3.36697-2.11586 1.73644-4.14397 3.57462-2.02811 1.83817-3.96359 3.77364-1.93548 1.93547-3.77364 3.96359-1.83817 2.02811-3.57462 4.14397-1.73644 2.11586-3.36697 4.31438-1.63053 2.19851-3.15122 4.47439-1.52069 2.27587-2.92788 4.62362-1.40719 2.34775-2.69748 4.76173-1.2903 2.41397-2.46059 4.88834-1.17029 2.47437-2.21776 5.00318-1.04747 2.52882-1.96959 5.10598-0.92213 2.57717-1.71669 5.19649-0.79456 2.61931-1.45963 5.27445-0.66508 2.65514-1.19908 5.33972-0.534 2.68458-0.93562 5.39213-0.40163 2.70754-0.66992 5.43153-0.26829 2.72398-0.40259 5.45786-0.13431 2.73388-0.13431 5.47105 0 2.73717 0.13431 5.47105 0.13431 2.73388 0.40259 5.45787 0.26829 2.72399 0.66992 5.43153 0.40163 2.70754 0.93562 5.39211 0.534 2.68457 1.19907 5.33973 0.66508 2.65515 1.45964 5.27445 0.79456 2.61931 1.71669 5.19648 0.92213 2.57716 1.96959 5.10597 1.04747 2.52881 2.21776 5.00319 1.17029 2.47438 2.46059 4.88835 1.29029 2.41397 2.69748 4.76172 1.40719 2.34775 2.92788 4.62363 1.52069 2.27587 3.15122 4.47439 1.63053 2.19852 3.36697 4.31439 1.73644 2.11586 3.57462 4.14397 1.83817 2.02811 3.77364 3.96358 1.93547 1.93547 3.96359 3.77365 2.02811 1.83816 4.14397 3.57461 2.11586 1.73644 4.31438 3.36696 2.19851 1.63054 4.47439 3.15122 2.27587 1.52069 4.62362 2.92787 2.34775 1.40719 4.76173 2.69749 2.41397 1.2903 4.88834 2.46059 2.47437 1.17029 5.00318 2.21776 2.52882 1.04747 5.10598 1.96959 2.57717 0.92212 5.19649 1.71669 2.61931 0.79454 5.27445 1.45961 2.65514 0.6651 5.33972 1.19909 2.68458 0.534 5.39213 0.93564 2.70754 0.40163 5.43153 0.66992 2.72398 0.26828 5.45786 0.40259 2.73388 0.13431 5.47105 0.13431z m107.67195-131.42495q1.82805 9.87855 1.82805 19.92495 0 10.04641-1.82805 19.92496-1.93857 10.47575-5.86012 20.38141-4.08624 10.32162-10.16081 19.61311-6.20482 9.49071-14.22283 17.50871-8.01799 8.01799-17.50871 14.22283-9.29149 6.07457-19.61311 10.16081-9.90566 3.92155-20.38141 5.86012-9.87855 1.82805-19.92496 1.82805-10.0464 0-19.92495-1.82805-10.47577-1.93857-20.38142-5.86012-10.32161-4.08623-19.6131-10.16081-9.49074-6.20484-17.50872-14.22283-8.01798-8.01797-14.22282-17.50871-6.07457-9.29147-10.16081-19.61311-3.92155-9.90564-5.86012-20.38141-1.82806-9.87862-1.82806-19.92496 0-10.04633 1.82806-19.92495 1.93857-10.47578 5.86012-20.38142 4.08624-10.32162 10.16081-19.6131 6.20485-9.49076 14.22282-17.50872 8.01796-8.01796 17.50872-14.22282 9.29149-6.07458 19.6131-10.16081 9.90564-3.92155 20.38142-5.86012 9.87862-1.82806 19.92495-1.82806 10.04634 0 19.92496 1.82806 10.47577 1.93857 20.38141 5.86012 10.32164 4.08624 19.61311 10.16081 9.49074 6.20484 17.50871 14.22282 8.01799 8.01798 14.22283 17.50872 6.07458 9.2915 10.16081 19.6131 3.92155 9.90565 5.86012 20.38142z" fill="url(#power-stroke)" fill-rule="evenodd"></path>
+      </svg>
+      <div style="position:absolute;left:28px;top:28px;width:84px;height:84px;overflow:visible">
+        <svg viewBox="0 0 18 20" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:10.6px;top:7px;width:63px;height:70px;overflow:visible">
+          <path d="M8.9651365 10L8.9651365 0M17.825939 9.2012835C17.478045 7.4581718 16.62178 5.8571062 15.365136 4.5999999M17.319988 14.39468C17.997782 12.751493 18.173834 10.944395 17.825939 9.2012835M14.017358 18.434481C15.493009 17.44356 16.642195 16.037868 17.319988 14.39468M9.0281954 19.962746C10.805676 19.957178 12.541707 19.425402 14.017358 18.434481M4.0295558 18.465765C5.511385 19.447424 7.2507143 19.968313 9.0281954 19.962746M0.7016831 14.446733C1.3897581 16.085642 2.5477266 17.484106 4.0295558 18.465765M0.16320927 9.256609C-0.17375951 11.001866 0.013608038 12.807824 0.7016831 14.446733M2.5951366 4.6399999C1.3463928 5.904954 0.50017804 7.5113516 0.16320927 9.256609" fill="none" stroke="#82b0a0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+        </svg>
+      </div>
+    </div>
+    <div class="disabled-title">nikkel is off</div>
+    <div class="disabled-desc">The extension is disabled.<br/>Enable it to start reviewing websites.</div>
   </div>
 
   <div id="vActive" class="view">
@@ -105,6 +195,35 @@
     </div>
     <div class="sep"></div>
     <div id="shareSection">    </div>
+  </div>
+
+  <div id="vReview" class="view">
+    <div class="vauth-user">
+      <div class="vauth-avatar" id="reviewAvatar"></div>
+      <div class="vauth-user-info">
+        <div class="vauth-name" id="reviewName"></div>
+        <div class="vauth-email" id="reviewEmail"></div>
+      </div>
+      <div class="vauth-dashboard-btn" id="reviewDashboardBtn">
+        <svg width="18" height="20" viewBox="-0.5 -0.5 17 19" fill="none"><path d="M4.4 0H1.6C1.17565 0 0.768688 0.168571 0.468629 0.468629C0.168571 0.768687 0 1.17565 0 1.6V6.4C0 6.61011 0.0413853 6.81817 0.121793 7.01229C0.2022 7.20641 0.320056 7.3828 0.468629 7.53137C0.617203 7.67994 0.793586 7.7978 0.987707 7.87821C1.18183 7.95861 1.38988 8 1.6 8H4.4C4.61011 8 4.81817 7.95861 5.01229 7.87821C5.20641 7.7978 5.3828 7.67994 5.53137 7.53137C5.67994 7.3828 5.7978 7.20641 5.87821 7.01229C5.95861 6.81817 6 6.61011 6 6.4V1.6C6 1.17565 5.83143 0.768687 5.53137 0.468629C5.23131 0.168571 4.82435 0 4.4 0ZM4.4 12H1.6C1.17565 12 0.768688 12.1686 0.468629 12.4686C0.168571 12.7687 0 13.1757 0 13.6V16.4C0 16.8243 0.168571 17.2313 0.468629 17.5314C0.768688 17.8314 1.17565 18 1.6 18H4.4C4.82435 18 5.23131 17.8314 5.53137 17.5314C5.83143 17.2313 6 16.8243 6 16.4V13.6C6 13.1757 5.83143 12.7687 5.53137 12.4686C5.23131 12.1686 4.82435 12 4.4 12ZM14.4 0H11.6C11.1757 0 10.7687 0.168571 10.4686 0.468629C10.1686 0.768687 10 1.17565 10 1.6V4.4C10 4.82435 10.1686 5.23131 10.4686 5.53137C10.7687 5.83143 11.1757 6 11.6 6H14.4C14.8243 6 15.2313 5.83143 15.5314 5.53137C15.8314 5.23131 16 4.82435 16 4.4V1.6C16 1.17565 15.8314 0.768687 15.5314 0.468629C15.2313 0.168571 14.8243 0 14.4 0ZM14.4 10H11.6C11.1757 10 10.7687 10.1686 10.4686 10.4686C10.1686 10.7687 10 11.1757 10 11.6V16.4C10 16.8243 10.1686 17.2313 10.4686 17.5314C10.7687 17.8314 11.1757 18 11.6 18H14.4C14.8243 18 15.2313 17.8314 15.5314 17.5314C15.8314 17.2313 16 16.8243 16 16.4V11.6C16 11.1757 15.8314 10.7687 15.5314 10.4686C15.2313 10.1686 14.8243 10 14.4 10Z" stroke="#82b0a0" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <div class="vauth-divider"></div>
+    <div class="vauth-website"><img class="vauth-favicon" id="reviewFavicon" alt=""/><span class="vauth-website-text" id="reviewWebsite"></span></div>
+    <div class="review-card" id="reviewCard">
+      <div class="review-counter">
+        <div class="review-badge" id="reviewBadge">0</div>
+        <span class="review-badge-text">nikkels dropped</span>
+      </div>
+      <button class="review-share-btn" id="reviewShareBtn">Share link</button>
+    </div>
+    <div id="reviewShareSection"></div>
+    <div class="vauth-signout" id="reviewSignOut">
+      <span class="vauth-signout-text">Sign out</span>
+      <div class="vauth-power-icon">
+        <svg viewBox="-1 -1 17.5 18.5" fill="none" style="width:100%;height:100%"><path d="M2.75 2C1.53639 3.02477 0.666966 4.39771 0.259429 5.93294C-0.148108 7.46817 -0.074076 9.09155 0.471504 10.5833C1.01708 12.0751 2.00786 13.3632 3.30971 14.2732C4.61156 15.1833 6.1616 15.6714 7.75 15.6714C9.3384 15.6714 10.8884 15.1833 12.1903 14.2732C13.4921 13.3632 14.4829 12.0751 15.0285 10.5833C15.5741 9.09155 15.6481 7.46817 15.2406 5.93294C14.833 4.39771 13.9636 3.02477 12.75 2M7.75 8V0" stroke="#82b0a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
   </div>
 
   <script src="popup.js"></script>

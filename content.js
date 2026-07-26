@@ -231,13 +231,18 @@ const BAR_HTML = `
     #pinDrawer.visible { display: block; }
     #pinDrawerHeader {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 6px 12px 8px;
+      gap: 4px;
+      padding: 6px 8px 8px;
       border-bottom: 1px solid #ffffff1f;
       margin-bottom: 4px;
     }
-    #pinDrawerHeader span { color: #e2e8f0; font-weight: 600; font-size: 13px; }
+    #pinDrawerHeader span { flex: 1; text-align: center; color: #e2e8f0; font-weight: 600; font-size: 13px; }
+    .pdArrow {
+      background: none; border: none; color: #64748b; cursor: pointer;
+      font-size: 12px; padding: 2px 6px; line-height: 1; border-radius: 4px;
+    }
+    .pdArrow:hover { color: #e2e8f0; background: #ffffff1f; }
     #pinDrawerClose {
       background: none;
       border: none;
@@ -305,7 +310,7 @@ const BAR_HTML = `
   <div class="nikkel-bar" role="toolbar" aria-label="Nikkel review toolbar">
 
     <div class="icon-tile" id="logoIcon" role="button" tabindex="0" aria-label="Open dashboard">
-      <div class="tooltip"><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>D</kbd> to view Dashboard.</h2></div>
+      <div class="tooltip"><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>Shift</kbd>+<kbd>D</kbd> to view Dashboard.</h2></div>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
         <rect x="3" y="3" width="7" height="9" rx="2" stroke="url(#logoGrad)" stroke-width="1.8"/>
         <rect x="14" y="3" width="7" height="5" rx="2" stroke="url(#logoGrad)" stroke-width="1.8"/>
@@ -394,7 +399,9 @@ const BAR_HTML = `
 
   <div id="pinDrawer">
     <div id="pinDrawerHeader">
+      <button id="pinDrawerPrev" class="pdArrow">◀</button>
       <span>All Pins</span>
+      <button id="pinDrawerNext" class="pdArrow">▶</button>
       <button id="pinDrawerClose">✕</button>
     </div>
     <div id="pinDrawerList"></div>
@@ -518,7 +525,9 @@ let currentSessionId = null;
 let currentReviewId = null;
 let currentDashboardUrl = '';
 let readOnly = false;
+let currentPageIdx = 0;
 let pollInterval = null;
+let scrollLockCount = 0;
 
 const NIKKEL_SKIP_SELECTORS = '#nikkel-bar-host, #nikkel-comment-host, #nikkel-popover-host, #nikkel-pins';
 
@@ -557,11 +566,7 @@ function createShadowHost(id) {
   if (!host) {
     host = document.createElement('div');
     host.id = id;
-    if (id === 'nikkel-pins') {
-      document.documentElement.appendChild(host);
-    } else {
-      document.body.appendChild(host);
-    }
+    document.documentElement.appendChild(host);
   }
   return host;
 }
@@ -696,18 +701,42 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
       if (chrome.runtime.lastError) return;
       const list = qs(pinDrawer, 'pinDrawerList');
       if (!list) return;
-      if (res?.ok && res.nikkels?.length) {
-        list.innerHTML = res.nikkels.map(n => {
-          let pageLabel = '';
-          try { const u = new URL(n.pageUrl); pageLabel = u.hostname + u.pathname; } catch { pageLabel = n.pageUrl || ''; }
-          const text = n.elementText ? `"${n.elementText.slice(0, 60)}"` : '';
+      if (!res?.ok || !res.nikkels?.length) {
+        list.innerHTML = '<div id="pinDrawerEmpty">No pins yet</div>';
+        pinDrawer.classList.add('visible');
+        return;
+      }
+      const allNikkels = res.nikkels;
+      const uniqueUrls = [...new Set(allNikkels.map(n => n.page_url))];
+      function pageLabel(url) {
+        try { const u = new URL(url); const l = u.pathname || '/'; return l.length > 20 ? l.slice(0, 17) + '...' : l; }
+        catch { return (url || '').length > 20 ? (url || '').slice(0, 17) + '...' : (url || ''); }
+      }
+      const pages = [{ label: 'All Pins', url: null }];
+      uniqueUrls.forEach(url => { pages.push({ label: pageLabel(url), url }); });
+      if (currentPageIdx >= pages.length) currentPageIdx = 0;
+
+      function filtered() {
+        if (currentPageIdx === 0) return allNikkels;
+        return allNikkels.filter(n => n.page_url === pages[currentPageIdx].url);
+      }
+
+      function render() {
+        const nikkels = filtered();
+        const title = qs(pinDrawer, 'pinDrawerHeader')?.querySelector('span');
+        if (title) {
+          const cur = pages[currentPageIdx];
+          title.textContent = pages.length > 1 ? (cur.url === location.href ? 'This page' : cur.label) : 'All Pins';
+        }
+        list.innerHTML = nikkels.map(n => {
+          const x = n.x ?? 0;
+          const y = n.y ?? 0;
+          const text = n.element_text ? `"${n.element_text.slice(0, 60)}"` : '';
           const comment = n.comment ? n.comment.slice(0, 80) : '';
-          const x = n.pageX ?? n.x ?? 0;
-          const y = n.pageY ?? n.y ?? 0;
-          return `<div class="pdItem" data-x="${x}" data-y="${y}">
+          return `<div class="pdItem" data-x="${x}" data-y="${y}" data-page-url="${escHtml(n.page_url || '')}">
             <span class="pdIdx">${n.idx || '?'}</span>
             <div class="pdBody">
-              <span class="pdPage">${pageLabel}</span>
+              <span class="pdPage">${pageLabel(n.page_url)}</span>
               <div class="pdMeta">${n.tag ? `<strong>&lt;${n.tag}&gt;</strong> ` : ''}${text}</div>
               ${comment ? `<div class="pdComment">${comment}</div>` : ''}
             </div>
@@ -717,14 +746,24 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
           el.addEventListener('click', () => {
             const x = parseInt(el.dataset.x);
             const y = parseInt(el.dataset.y);
-            window.scrollTo({ left: Math.max(0, x - 200), top: Math.max(0, y - 200), behavior: 'smooth' });
+            const pageUrl = el.dataset.pageUrl;
+            if (pageUrl && pageUrl !== location.href) {
+              chrome.runtime.sendMessage({ type: 'NAVIGATE_TO_PIN', payload: { pageUrl, x, y } });
+            } else {
+              window.scrollTo({ left: Math.max(0, x - 200), top: Math.max(0, y - 200), behavior: 'smooth' });
+            }
             pinDrawer.classList.remove('visible');
           });
         });
-      } else {
-        list.innerHTML = '<div id="pinDrawerEmpty">No pins yet</div>';
+        pinDrawer.classList.add('visible');
       }
-      pinDrawer.classList.add('visible');
+
+      const prevBtn = qs(pinDrawer, 'pinDrawerPrev');
+      const nextBtn = qs(pinDrawer, 'pinDrawerNext');
+      prevBtn.onclick = () => { currentPageIdx = (currentPageIdx - 1 + pages.length) % pages.length; render(); };
+      nextBtn.onclick = () => { currentPageIdx = (currentPageIdx + 1) % pages.length; render(); };
+
+      render();
     });
   }
 
@@ -917,6 +956,7 @@ function injectCommentBubble(cx, cy, elementInfo) {
   commentHost.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647`;
 
   if (cbTa) cbTa.focus();
+  lockScroll();
 
   return new Promise((resolve) => {
     commentResolve = resolve;
@@ -958,6 +998,7 @@ function removeCommentBubble() {
   if (commentHost) {
     commentHost.remove();
     commentHost = null;
+    unlockScroll();
   }
   if (commentResolve) {
     commentResolve(null);
@@ -978,9 +1019,9 @@ function injectPopover(pageX, pageY, nikkel) {
   const nvClose = qs(shadow, 'nvClose');
 
   if (nvNum) nvNum.textContent = `#${nikkel.idx || '?'}`;
-  if (nvEl) nvEl.textContent = `<${nikkel.tag || '?'}> ${(nikkel.elementText || '').slice(0, 60)}`;
+  if (nvEl) nvEl.textContent = `<${nikkel.tag || '?'}> ${((nikkel.element_text || nikkel.elementText) || '').slice(0, 60)}`;
   if (nvComment) nvComment.textContent = nikkel.comment || '';
-  if (nvMeta) nvMeta.textContent = nikkel.selector ? `Selector: ${nikkel.selector}` : '';
+  if (nvMeta) nvMeta.textContent = (nikkel.dom_selector || nikkel.selector) ? `Selector: ${nikkel.dom_selector || nikkel.selector}` : '';
 
   let x = pageX - window.scrollX;
   let y = pageY - window.scrollY;
@@ -992,6 +1033,7 @@ function injectPopover(pageX, pageY, nikkel) {
   if (y < 10) y = 10;
 
   popoverHost.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:2147483647`;
+  lockScroll();
 
   if (nvClose) nvClose.addEventListener('click', removePopover);
 
@@ -1116,6 +1158,7 @@ function removePopover() {
   if (popoverHost) {
     popoverHost.remove();
     popoverHost = null;
+    unlockScroll();
   }
 }
 
@@ -1135,9 +1178,9 @@ function addPin(nikkel) {
   pin.dataset.idx = idx;
   pin.dataset.sessionId = nikkel.sessionId || '';
   pin.textContent = idx;
-  const px = (nikkel.pageX ?? nikkel.x ?? 0) - 13;
-  const py = (nikkel.pageY ?? nikkel.y ?? 0) - 13;
-  const pc = pinColor(nikkel.userId);
+  const px = (nikkel.x ?? nikkel.pageX ?? 0) - 13;
+  const py = (nikkel.y ?? nikkel.pageY ?? 0) - 13;
+  const pc = pinColor(nikkel.owner_id || nikkel.userId);
   pin.style.cssText = `
     position: absolute;
     left: ${px}px;
@@ -1171,7 +1214,17 @@ function addPin(nikkel) {
   pin.addEventListener('click', (e) => {
     e.stopPropagation();
     removeCommentBubble();
-    injectPopover((nikkel.pageX ?? nikkel.x ?? 0) + 13, (nikkel.pageY ?? nikkel.y ?? 0) + 13, nikkel);
+    clearHighlight();
+    const sel = nikkel.dom_selector || nikkel.selector;
+    if (sel) {
+      const el = document.querySelector(sel);
+      if (el) {
+        highlightEl = el;
+        el.style.outline = '2px solid #71b9a1';
+        el.style.boxShadow = '0px 0px 87.5px 4px #26f0ad4a';
+      }
+    }
+    injectPopover((nikkel.x ?? nikkel.pageX ?? 0) + 13, (nikkel.y ?? nikkel.pageY ?? 0) + 13, nikkel);
   });
   pinsContainer.appendChild(pin);
   pins.push(nikkel);
@@ -1199,13 +1252,44 @@ function updateBadge() {
 function clearHighlight() {
   if (highlightEl) {
     highlightEl.style.outline = '';
+    highlightEl.style.boxShadow = '';
     highlightEl = null;
+  }
+}
+
+function resolveTarget(el) {
+  const structural = ['div','section','article','main','header','footer','nav','aside','figure','li','ol','ul','table','form'];
+  while (el && el !== document.body && el !== document.documentElement) {
+    if (el.id) return el;
+    if (structural.includes(el.tagName.toLowerCase())) return el;
+    el = el.parentElement;
+  }
+  return el;
+}
+
+function lockScroll() {
+  scrollLockCount++;
+  if (scrollLockCount === 1) {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.documentElement.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+  }
+}
+
+function unlockScroll() {
+  scrollLockCount = Math.max(0, scrollLockCount - 1);
+  if (scrollLockCount === 0) {
+    document.documentElement.style.overflow = '';
+    document.body.style.paddingRight = '';
   }
 }
 
 function handleMousemove(e) {
   if (currentMode !== 'annotate') return;
-  const target = e.target;
+  if (commentHost) return;
+  const target = resolveTarget(e.target);
   if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) {
     clearHighlight();
     return;
@@ -1213,7 +1297,8 @@ function handleMousemove(e) {
 
   clearHighlight();
   highlightEl = target;
-  target.style.outline = '1.5px solid rgba(99,102,241,.55)';
+  target.style.outline = '2px solid #71b9a1';
+  target.style.boxShadow = '0px 0px 87.5px 4px #26f0ad4a';
 
   const info = getElementInfo(target);
   const host = document.getElementById('nikkel-bar-host');
@@ -1232,7 +1317,7 @@ function handleMousemove(e) {
 
 async function handleDocumentClick(e) {
   if (currentMode !== 'annotate') return;
-  const target = e.target;
+  const target = resolveTarget(e.target);
   if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) return;
 
   e.preventDefault();
@@ -1269,16 +1354,16 @@ async function handleDocumentClick(e) {
 }
 
 function handleKeydown(e) {
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
   if (e.key === '`' || e.key === 'Backquote' || e.key === '´') {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
     if (currentMode !== 'annotate' && currentMode !== 'browse') return;
     const newMode = currentMode === 'annotate' ? 'browse' : 'annotate';
     setMode(newMode);
     try { chrome.runtime.sendMessage({ type: 'MODE_CHANGED', payload: { mode: newMode } }); } catch {}
     return;
   }
-  if (e.key === 'd' || e.key === 'D') {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+  if (e.key === 'D' && e.shiftKey) {
     chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
       window.open(res?.dashboardUrl || currentDashboardUrl, '_blank');
     });
@@ -1417,6 +1502,11 @@ function loadPinsForReview() {
         nres.nikkels.forEach((n) => addPin(n));
       }
       updateBadge();
+      chrome.runtime.sendMessage({ type: 'GET_PENDING_SCROLL' }, (sres) => {
+        if (sres?.ok && sres.scroll) {
+          window.scrollTo({ left: Math.max(0, sres.scroll.x - 200), top: Math.max(0, sres.scroll.y - 200), behavior: 'smooth' });
+        }
+      });
     });
   } catch (e) { console.warn('[Nikkel] GET_NIKKELS failed', e.message); }
 }
