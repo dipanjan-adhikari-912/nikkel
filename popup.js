@@ -190,8 +190,10 @@ function showActiveView(state) {
     const tab = await getActiveTab();
     const res = await bg({ type: 'SHARE', payload: { tabId: tab?.id } });
     if (res.ok && res.shareUrl) {
-      $('reviewCard').style.display = 'none';
-      showReviewShareUrl(res.shareUrl);
+      try { await navigator.clipboard.writeText(res.shareUrl); } catch {}
+      $('reviewShareBtn').textContent = 'Link copied';
+      $('reviewShareBtn').disabled = false;
+      setTimeout(() => { $('reviewShareBtn').textContent = 'Share link'; }, 2000);
     } else {
       $('reviewShareBtn').disabled = false;
       $('reviewShareBtn').textContent = 'Share link';
