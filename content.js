@@ -1027,7 +1027,7 @@ function injectPopover(pageX, pageY, nikkel) {
     const src = nikkel.screenshotUrl || nikkel.screenshot_url;
     if (src) {
       nvScreenshot.src = src;
-      nvScreenshot.style.display = '';
+      nvScreenshot.style.display = 'block';
     }
   }
   if (nvComment) nvComment.textContent = nikkel.comment || '';
