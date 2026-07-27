@@ -1358,10 +1358,12 @@ async function handleDocumentClick(e) {
   const pageX = Math.round(clientX + window.scrollX);
   const pageY = Math.round(clientY + window.scrollY);
 
+  const screenshotPromise = capturePinScreenshot(raw);
+
   const result = await injectCommentBubble(clientX, clientY, info);
   if (!result) return;
 
-  const screenshotUrl = await capturePinScreenshot(raw);
+  const screenshotUrl = await screenshotPromise;
 
   const nikkel = {
     pageX,
