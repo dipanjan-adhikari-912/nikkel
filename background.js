@@ -307,7 +307,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const capTabId = sender.tab?.id;
         if (!capTabId) return { ok: false, error: 'No tab' };
         try {
-          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'png' });
+          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'jpeg', quality: 40 });
           return { ok: true, dataUrl };
         } catch (e) {
           console.warn('[Nikkel] captureVisibleTab failed:', e.message);
