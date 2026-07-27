@@ -390,7 +390,7 @@ const BAR_HTML = `
   <button id="annotateBtn" style="display:none"></button>
   <div id="inspIdle" style="display:none"></div>
   <div id="inspLive" style="display:none">
-    <span><span class="il">Tag:</span> <span class="iv" id="iTag">—</span></span>
+    <span><span class="il">Tag:</span> <span class="iv" id="iTag">—</span> <span id="iFine" style="color:#f59e0b;font-weight:600;display:none">(Fine)</span></span>
     <span><span class="il">Text:</span> <span class="iv" id="iText">—</span></span>
     <span><span class="il">Sel:</span> <span class="iv" id="iSel">—</span></span>
     <span><span class="il">XY:</span> <span class="iv" id="iXY">—</span></span>
@@ -1289,18 +1289,25 @@ function unlockScroll() {
 function handleMousemove(e) {
   if (currentMode !== 'annotate') return;
   if (commentHost) return;
-  const target = resolveTarget(e.target);
-  if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) {
+  const fine = e.ctrlKey || e.metaKey;
+  let raw;
+  if (fine) {
+    const all = document.elementsFromPoint(e.clientX, e.clientY).filter(el => el !== document.documentElement && el !== document.body);
+    raw = all[0] || null;
+  } else {
+    raw = resolveTarget(e.target);
+  }
+  if (!raw || raw.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(raw)) {
     clearHighlight();
     return;
   }
 
   clearHighlight();
-  highlightEl = target;
-  target.style.outline = '2px solid #71b9a1';
-  target.style.boxShadow = '0px 0px 87.5px 4px #26f0ad4a';
+  highlightEl = raw;
+  raw.style.outline = fine ? '2px solid #f59e0b' : '2px solid #71b9a1';
+  raw.style.boxShadow = fine ? '0px 0px 87.5px 4px #f59e0b4a' : '0px 0px 87.5px 4px #26f0ad4a';
 
-  const info = getElementInfo(target);
+  const info = getElementInfo(raw);
   const host = document.getElementById('nikkel-bar-host');
   if (!host) return;
   const shadow = host.shadowRoot;
@@ -1309,16 +1316,25 @@ function handleMousemove(e) {
   const iText = qs(shadow, 'iText');
   const iSel = qs(shadow, 'iSel');
   const iXY = qs(shadow, 'iXY');
+  const iFine = qs(shadow, 'iFine');
   if (iTag) iTag.textContent = info.tag;
   if (iText) iText.textContent = info.elementText.slice(0, 60);
   if (iSel) iSel.textContent = info.selector;
   if (iXY) iXY.textContent = `${info.pageX}, ${info.pageY}`;
+  if (iFine) iFine.style.display = fine ? '' : 'none';
 }
 
 async function handleDocumentClick(e) {
   if (currentMode !== 'annotate') return;
-  const target = resolveTarget(e.target);
-  if (!target || target.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(target)) return;
+  const fine = e.ctrlKey || e.metaKey;
+  let raw;
+  if (fine) {
+    const all = document.elementsFromPoint(e.clientX, e.clientY).filter(el => el !== document.documentElement && el !== document.body);
+    raw = all[0] || null;
+  } else {
+    raw = resolveTarget(e.target);
+  }
+  if (!raw || raw.closest(NIKKEL_SKIP_SELECTORS) || isNikkelOwned(raw)) return;
 
   e.preventDefault();
   e.stopPropagation();
@@ -1326,7 +1342,7 @@ async function handleDocumentClick(e) {
   if (commentHost) removeCommentBubble();
   if (popoverHost) removePopover();
 
-  const info = getElementInfo(target);
+  const info = getElementInfo(raw);
   const clientX = e.clientX;
   const clientY = e.clientY;
   const pageX = Math.round(clientX + window.scrollX);
