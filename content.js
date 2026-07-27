@@ -1383,10 +1383,9 @@ async function handleDocumentClick(e) {
 }
 
 async function capturePinScreenshot(el) {
-  const nikkelEls = ['nikkel-bar-host', 'nikkel-pins', 'nikkel-comment-host', 'nikkel-popover-host']
-    .map(id => document.getElementById(id)).filter(Boolean);
-  const prev = nikkelEls.map(e => ({ el: e, display: e.style.display }));
-  nikkelEls.forEach(e => e.style.display = 'none');
+  const styleTag = document.createElement('style');
+  styleTag.textContent = '[id^="nikkel-"] { display: none !important; }';
+  document.documentElement.appendChild(styleTag);
   await new Promise(r => requestAnimationFrame(() => setTimeout(r, 50)));
 
   try {
@@ -1423,7 +1422,7 @@ async function capturePinScreenshot(el) {
     console.warn('[Nikkel] screenshot capture failed:', e.message);
     return null;
   } finally {
-    nikkelEls.forEach((_, i) => prev[i].el.style.display = prev[i].display);
+    styleTag.remove();
   }
 }
 
