@@ -1387,7 +1387,7 @@ async function capturePinScreenshot(el) {
     .map(id => document.getElementById(id)).filter(Boolean);
   const prev = nikkelEls.map(e => ({ el: e, display: e.style.display }));
   nikkelEls.forEach(e => e.style.display = 'none');
-  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 50)));
 
   try {
     const result = await new Promise(resolve => {
