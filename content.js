@@ -1026,8 +1026,11 @@ function injectPopover(pageX, pageY, nikkel) {
   if (nvScreenshot) {
     const src = nikkel.screenshotUrl || nikkel.screenshot_url;
     if (src) {
+      console.log('[Nikkel] setting screenshot src, length:', src.length);
       nvScreenshot.src = src;
       nvScreenshot.style.display = '';
+    } else {
+      console.log('[Nikkel] no screenshot url in nikkel');
     }
   }
   if (nvComment) nvComment.textContent = nikkel.comment || '';
@@ -1387,7 +1390,10 @@ async function capturePinScreenshot(el) {
     const result = await new Promise(resolve => {
       chrome.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' }, resolve);
     });
-    if (!result?.ok || !result.dataUrl) return null;
+    if (!result?.ok || !result.dataUrl) {
+      console.log('[Nikkel] captureScreenshot response not ok', result);
+      return null;
+    }
 
     const rect = el.getBoundingClientRect();
     const pad = 50;
@@ -1399,7 +1405,10 @@ async function capturePinScreenshot(el) {
     const sw = Math.min(Math.round(rect.width + pad * 2), vw - sx);
     const sh = Math.min(Math.round(rect.height + pad * 2), vh - sy);
 
-    if (sw <= 0 || sh <= 0) return null;
+    if (sw <= 0 || sh <= 0) {
+      console.log('[Nikkel] crop region empty', sw, sh);
+      return null;
+    }
 
     const img = new Image();
     img.src = result.dataUrl;
@@ -1412,7 +1421,9 @@ async function capturePinScreenshot(el) {
     if (!ctx) return null;
 
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    return canvas.toDataURL('image/jpeg', 0.6);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    console.log('[Nikkel] screenshot captured, url length:', dataUrl.length);
+    return dataUrl;
   } catch (e) {
     console.warn('[Nikkel] screenshot capture failed:', e.message);
     return null;
