@@ -1358,12 +1358,10 @@ async function handleDocumentClick(e) {
   const pageX = Math.round(clientX + window.scrollX);
   const pageY = Math.round(clientY + window.scrollY);
 
-  const screenshotPromise = capturePinScreenshot(raw);
-
   const result = await injectCommentBubble(clientX, clientY, info);
   if (!result) return;
 
-  const screenshotUrl = await screenshotPromise;
+  const screenshotUrl = await capturePinScreenshot(raw);
 
   const nikkel = {
     pageX,
@@ -1387,8 +1385,8 @@ async function handleDocumentClick(e) {
 async function capturePinScreenshot(el) {
   const nikkelEls = ['nikkel-bar-host', 'nikkel-pins', 'nikkel-comment-host', 'nikkel-popover-host']
     .map(id => document.getElementById(id)).filter(Boolean);
-  const prev = nikkelEls.map(el => ({ el, display: el.style.display }));
-  nikkelEls.forEach(el => el.style.display = 'none');
+  const prev = nikkelEls.map(e => ({ el: e, display: e.style.display }));
+  nikkelEls.forEach(e => e.style.display = 'none');
   await new Promise(r => requestAnimationFrame(r));
 
   try {
