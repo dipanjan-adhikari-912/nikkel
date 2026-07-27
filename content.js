@@ -459,6 +459,7 @@ const POPOVER_HTML = `
     #nvClose:hover { color: #e2e8f0; }
     #nvEl { color: #94a3b8; font-size: 11px; margin-bottom: 6px; }
     #nvComment { color: #e2e8f0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
+    #nvScreenshot { max-width: 100%; border-radius: 4px; margin-bottom: 6px; display: none; }
     #nvMeta { color: #64748b; font-size: 11px; margin-top: 6px; }
     #comments { border-top: 1px solid #1e293b; margin-top: 8px; padding-top: 6px; }
     #commentsTitle { color: #94a3b8; font-size: 11px; font-weight: 600; margin-bottom: 4px; }
@@ -483,6 +484,7 @@ const POPOVER_HTML = `
       <button id="nvClose">✕</button>
     </div>
     <div id="nvEl"></div>
+    <img id="nvScreenshot" />
     <div id="nvComment"></div>
     <div id="nvMeta"></div>
     <div id="comments">
@@ -1014,12 +1016,20 @@ function injectPopover(pageX, pageY, nikkel) {
 
   const nvNum = qs(shadow, 'nvNum');
   const nvEl = qs(shadow, 'nvEl');
+  const nvScreenshot = qs(shadow, 'nvScreenshot');
   const nvComment = qs(shadow, 'nvComment');
   const nvMeta = qs(shadow, 'nvMeta');
   const nvClose = qs(shadow, 'nvClose');
 
   if (nvNum) nvNum.textContent = `#${nikkel.idx || '?'}`;
   if (nvEl) nvEl.textContent = `<${nikkel.tag || '?'}> ${((nikkel.element_text || nikkel.elementText) || '').slice(0, 60)}`;
+  if (nvScreenshot) {
+    const src = nikkel.screenshotUrl || nikkel.screenshot_url;
+    if (src) {
+      nvScreenshot.src = src;
+      nvScreenshot.style.display = '';
+    }
+  }
   if (nvComment) nvComment.textContent = nikkel.comment || '';
   if (nvMeta) nvMeta.textContent = (nikkel.dom_selector || nikkel.selector) ? `Selector: ${nikkel.dom_selector || nikkel.selector}` : '';
 
@@ -1351,6 +1361,8 @@ async function handleDocumentClick(e) {
   const result = await injectCommentBubble(clientX, clientY, info);
   if (!result) return;
 
+  const screenshotUrl = await capturePinScreenshot(raw);
+
   const nikkel = {
     pageX,
     pageY,
@@ -1361,12 +1373,50 @@ async function handleDocumentClick(e) {
     selector: result.elementInfo.selector,
     elementText: result.elementInfo.elementText,
     comment: result.comment,
+    screenshotUrl,
   };
 
   console.log('[Nikkel] submitting nikkel', nikkel);
   bgMsg({ type: 'SUBMIT_NIKKEL', payload: { nikkel } }, (res) => {
     if (!res?.ok) console.error('[Nikkel] Submit failed:', res.error);
   });
+}
+
+async function capturePinScreenshot(el) {
+  try {
+    const result = await new Promise(resolve => {
+      chrome.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' }, resolve);
+    });
+    if (!result?.ok || !result.dataUrl) return null;
+
+    const rect = el.getBoundingClientRect();
+    const pad = 50;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const sx = Math.max(0, Math.round(rect.left - pad));
+    const sy = Math.max(0, Math.round(rect.top - pad));
+    const sw = Math.min(Math.round(rect.width + pad * 2), vw - sx);
+    const sh = Math.min(Math.round(rect.height + pad * 2), vh - sy);
+
+    if (sw <= 0 || sh <= 0) return null;
+
+    const img = new Image();
+    img.src = result.dataUrl;
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    return canvas.toDataURL('image/jpeg', 0.6);
+  } catch (e) {
+    console.warn('[Nikkel] screenshot capture failed:', e.message);
+    return null;
+  }
 }
 
 function handleKeydown(e) {

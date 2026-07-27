@@ -291,7 +291,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (Array.isArray(existing) && existing.length > 0 && existing[0].idx != null) nextIdx = existing[0].idx + 1;
         } catch {}
         try {
-          const savedRes = await supabaseClient.request('/rest/v1/nikkels', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ review_id: tab.review.id, page_url: d.pageUrl, dom_selector: d.selector, x: d.pageX, y: d.pageY, viewport_w: d.viewportW, viewport_h: d.viewportH, tag: d.tag, element_text: d.elementText, comment: d.comment, idx: nextIdx, owner_id: globalState.user?.id }) });
+          const savedRes = await supabaseClient.request('/rest/v1/nikkels', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ review_id: tab.review.id, page_url: d.pageUrl, dom_selector: d.selector, x: d.pageX, y: d.pageY, viewport_w: d.viewportW, viewport_h: d.viewportH, tag: d.tag, element_text: d.elementText, screenshot_url: d.screenshotUrl || null, comment: d.comment, idx: nextIdx, owner_id: globalState.user?.id }) });
           const saved = Array.isArray(savedRes) ? savedRes[0] : savedRes;
           tab.nikkels.push(saved);
           await saveState();
@@ -300,6 +300,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch (e) {
           console.warn('[Nikkel] create nikkel failed:', e.message);
           return { ok: false, error: 'Could not save that pin — you may not have access to this project yet.' };
+        }
+      }
+
+      case 'CAPTURE_SCREENSHOT': {
+        const capTabId = sender.tab?.id;
+        if (!capTabId) return { ok: false, error: 'No tab' };
+        try {
+          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'png' });
+          return { ok: true, dataUrl };
+        } catch (e) {
+          console.warn('[Nikkel] captureVisibleTab failed:', e.message);
+          return { ok: false, error: e.message };
         }
       }
 
