@@ -106,6 +106,12 @@ const BAR_HTML = `
       border-radius: 40px;
       flex-shrink: 0;
     }
+    .nv-spinner {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid #71b9a1; border-top-color: transparent;
+      border-radius: 50%; animation: nv-spin .6s linear infinite; margin-left: 6px;
+    }
+    @keyframes nv-spin { to { transform: rotate(360deg); } }
 
     .btn-share {
       display: flex;
@@ -374,6 +380,7 @@ const BAR_HTML = `
       </button>
       <span style="color:#fff;font-size:14px">nikkels</span>
       <span class="badge" id="pinsBadge">0</span>
+      <span class="nv-spinner" id="pinLoader"></span>
     </div>
 
     <button class="btn-share" id="shareBtn">
@@ -1259,6 +1266,24 @@ function updateBadge() {
   if (el) el.textContent = pins.length;
 }
 
+function showPinLoader() {
+  const host = document.getElementById('nikkel-bar-host');
+  if (!host) return;
+  const shadow = host.shadowRoot;
+  if (!shadow) return;
+  const el = qs(shadow, 'pinLoader');
+  if (el) el.style.display = 'inline-block';
+}
+
+function hidePinLoader() {
+  const host = document.getElementById('nikkel-bar-host');
+  if (!host) return;
+  const shadow = host.shadowRoot;
+  if (!shadow) return;
+  const el = qs(shadow, 'pinLoader');
+  if (el) el.style.display = '';
+}
+
 function clearHighlight() {
   if (highlightEl) {
     highlightEl.style.outline = '';
@@ -1361,6 +1386,8 @@ async function handleDocumentClick(e) {
   const result = await injectCommentBubble(clientX, clientY, info);
   if (!result) return;
 
+  showPinLoader();
+
   const screenshotUrl = await capturePinScreenshot(raw);
 
   const nikkel = {
@@ -1378,6 +1405,7 @@ async function handleDocumentClick(e) {
 
   console.log('[Nikkel] submitting nikkel', nikkel);
   bgMsg({ type: 'SUBMIT_NIKKEL', payload: { nikkel } }, (res) => {
+    hidePinLoader();
     if (!res?.ok) console.error('[Nikkel] Submit failed:', res.error);
   });
 }
