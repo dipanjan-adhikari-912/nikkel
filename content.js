@@ -1385,6 +1385,12 @@ async function handleDocumentClick(e) {
 }
 
 async function capturePinScreenshot(el) {
+  const nikkelEls = ['nikkel-bar-host', 'nikkel-pins', 'nikkel-comment-host', 'nikkel-popover-host']
+    .map(id => document.getElementById(id)).filter(Boolean);
+  const prev = nikkelEls.map(el => ({ el, display: el.style.display }));
+  nikkelEls.forEach(el => el.style.display = 'none');
+  await new Promise(r => requestAnimationFrame(r));
+
   try {
     const result = await new Promise(resolve => {
       chrome.runtime.sendMessage({ type: 'CAPTURE_SCREENSHOT' }, resolve);
@@ -1392,9 +1398,9 @@ async function capturePinScreenshot(el) {
     if (!result?.ok || !result.dataUrl) return null;
 
     const rect = el.getBoundingClientRect();
-    const pad = 50;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    const pad = Math.min(50, Math.min(rect.width, rect.height) * 0.5 || 50);
 
     const sx = Math.max(0, Math.round(rect.left - pad));
     const sy = Math.max(0, Math.round(rect.top - pad));
@@ -1418,6 +1424,8 @@ async function capturePinScreenshot(el) {
   } catch (e) {
     console.warn('[Nikkel] screenshot capture failed:', e.message);
     return null;
+  } finally {
+    nikkelEls.forEach((_, i) => prev[i].el.style.display = prev[i].display);
   }
 }
 
