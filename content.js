@@ -356,7 +356,7 @@ const BAR_HTML = `
           <path d="M12 4v16M4 12h16"/>
         </svg>
       </div>
-      <div class="tooltip"><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>~</kbd> to toggle modes.</h2></div>
+      <div class="tooltip"><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>~</kbd> to toggle modes.</h2><h2 style="margin:0;font-size:12px;font-weight:400;font-family:inherit">Press <kbd>Ctrl</kbd> to select deeper elements.</h2></div>
     </div>
 
     <button class="pill pill-filled" id="eyeBtn" aria-label="Toggle nikkels visibility">
