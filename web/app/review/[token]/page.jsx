@@ -122,39 +122,39 @@ function Browser({ url, siteName }) {
   const site = siteName || host || 'Your Website'
   return (
     <div style={{ width: 1446, height: 1012, background: '#82b0a033', borderRadius: 24, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.35)', flexShrink: 0 }}>
-      {/* Toolbar (29.4px, #1b2723) */}
-      <div style={{ height: 29.4, background: '#1b2723', display: 'flex', alignItems: 'center', paddingLeft: 9.1, gap: 11.2 }}>
-        <div style={{ display: 'flex', gap: 5.6 }}>
-          <span style={{ width: 8.4, height: 8.4, borderRadius: '50%', background: '#ff6058' }} />
-          <span style={{ width: 8.4, height: 8.4, borderRadius: '50%', background: '#ffc130' }} />
-          <span style={{ width: 8.4, height: 8.4, borderRadius: '50%', background: '#27ca40' }} />
+      {/* Toolbar (38.2px, #1b2723) */}
+      <div style={{ height: 38.2, background: '#1b2723', display: 'flex', alignItems: 'center', paddingLeft: 11.8, gap: 14.6 }}>
+        <div style={{ display: 'flex', gap: 7.3 }}>
+          <span style={{ width: 10.9, height: 10.9, borderRadius: '50%', background: '#ff6058' }} />
+          <span style={{ width: 10.9, height: 10.9, borderRadius: '50%', background: '#ffc130' }} />
+          <span style={{ width: 10.9, height: 10.9, borderRadius: '50%', background: '#27ca40' }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6.3, background: '#ddf3ec', height: 23.8, padding: '0 5.6px', borderRadius: '8px 8px 0 0', minWidth: 0, maxWidth: 200 }}>
-          <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`} alt="" width={11.2} height={11.2} onError={e => e.target.style.display = 'none'} style={{ flexShrink: 0 }} />
-          <span style={{ color: '#1b2723', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{site}</span>
-          <svg width="7" height="7" viewBox="0 0 10 10" style={{ flexShrink: 0 }}><path d="M9.778 0.229C9.482 -0.066 9.004 -0.066 8.709 0.229L5 3.931L1.291 0.222C0.995 -0.074 0.518 -0.074 0.222 0.222C-0.074 0.518 -0.074 0.995 0.222 1.291L3.931 5L0.222 8.708C-0.074 9.004 -0.074 9.482 0.222 9.778C0.518 10.074 0.995 10.074 1.291 9.778L5 6.069L8.708 9.778C9.004 10.074 9.482 10.074 9.778 9.778C10.074 9.482 10.074 9.004 9.778 8.708L6.069 5L9.778 1.291C10.066 1.003 10.066 0.518 9.778 0.229Z" fill="#1b2723" /></svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8.2, background: '#ddf3ec', height: 31, padding: '0 7.3px', borderRadius: '10px 10px 0 0', minWidth: 0, maxWidth: 260 }}>
+          <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`} alt="" width={14.6} height={14.6} onError={e => e.target.style.display = 'none'} style={{ flexShrink: 0 }} />
+          <span style={{ color: '#1b2723', fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{site}</span>
+          <svg width="9" height="9" viewBox="0 0 10 10" style={{ flexShrink: 0 }}><path d="M9.778 0.229C9.482 -0.066 9.004 -0.066 8.709 0.229L5 3.931L1.291 0.222C0.995 -0.074 0.518 -0.074 0.222 0.222C-0.074 0.518 -0.074 0.995 0.222 1.291L3.931 5L0.222 8.708C-0.074 9.004 -0.074 9.482 0.222 9.778C0.518 10.074 0.995 10.074 1.291 9.778L5 6.069L8.708 9.778C9.004 10.074 9.482 10.074 9.778 9.778C10.074 9.482 10.074 9.004 9.778 8.708L6.069 5L9.778 1.291C10.066 1.003 10.066 0.518 9.778 0.229Z" fill="#1b2723" /></svg>
         </div>
       </div>
-      {/* URL bar (26.6px, #ddf3ec) */}
-      <div style={{ height: 26.6, background: '#ddf3ec', display: 'flex', alignItems: 'center', paddingLeft: 8.4, gap: 15.4 }}>
-        <svg width="9.8" height="8.4" viewBox="0 0 18 17.53"><path d="M16.845 7.615H3.942l5.637-5.637c0.45 -0.45 0.45 -1.19 0 -1.64 -0.45 -0.45 -1.178 -0.45 -1.629 0L0.338 7.95c-0.45 0.45 -0.45 1.179 0 1.629l7.612 7.612c0.451 0.451 1.179 0.451 1.63 0 0.45 -0.45 0.45 -1.178 0 -1.629L3.942 9.926h12.903c0.635 0 1.155 -0.52 1.155 -1.155 0 -0.636 -0.52 -1.156 -1.155 -1.156Z" fill="#1b2723" /></svg>
-        <svg width="9.8" height="8.4" viewBox="0 0 18 17.54"><path d="M1.155 9.926h12.903l-5.637 5.637c-0.45 0.45 -0.45 1.189 0 1.64 0.45 0.45 1.178 0.45 1.629 0l7.612 -7.612c0.45 -0.45 0.45 -1.179 0 -1.629L8.05 0.338c-0.45 -0.45 -1.179 -0.45 -1.629 0 -0.45 0.45 -0.45 1.179 0 1.629l5.636 5.648H1.155C0.52 7.615 0 8.135 0 8.77c0 0.636 0.52 1.156 1.155 1.156Z" fill="#a1bfb5" /></svg>
-        <svg width="9.8" height="8.4" viewBox="0 0 18 18"><path d="M18 6.497V1.207c0 -0.45 -0.54 -0.67 -0.85 -0.35l-1.78 1.78C13.557 0.827 10.977 -0.213 8.157 0.037c-4.19 0.38 -7.64 3.75 -8.1 7.94C-0.543 13.397 3.687 17.997 8.997 17.997c4.59 0 8.38 -3.44 8.93 -7.88 0.07 -0.6 -0.4 -1.12 -1 -1.12 -0.5 0 -0.92 0.37 -0.98 0.86 -0.43 3.49 -3.44 6.19 -7.05 6.14 -3.71 -0.05 -6.84 -3.18 -6.9 -6.9 -0.06 -3.9 3.11 -7.1 7 -7.1 1.93 0 3.68 0.79 4.95 2.05L11.857 6.137c-0.32 0.32 -0.1 0.86 0.35 0.86h5.29c0.28 0 0.5 -0.22 0.5 -0.5Z" fill="#a1bfb5" /></svg>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5.6, background: '#1b2723', height: 19.6, borderRadius: 14, paddingLeft: 8.4, paddingRight: 12, flex: 1, minWidth: 0, marginRight: 8 }}>
-          <svg width="7" height="8.4" viewBox="0 0 16 21" style={{ flexShrink: 0 }}><path d="M14 7h-1V5c0-2.76-2.24-5-5-5S3 2.24 3 5v2H2C0.9 7 0 7.9 0 9v10c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V9c0-1.1-0.9-2-2-2ZM8 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2ZM6 7V5c0-1.1.9-2 2-2s2 .9 2 2v2H6Z" fill="#ddf3ec" /></svg>
-          <span style={{ color: '#ddf3ec', fontSize: 13, fontFamily: 'Roboto, sans-serif', letterSpacing: '0.25px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      {/* URL bar (34.6px, #ddf3ec) */}
+      <div style={{ height: 34.6, background: '#ddf3ec', display: 'flex', alignItems: 'center', paddingLeft: 10.9, gap: 20 }}>
+        <svg width="12.7" height="10.9" viewBox="0 0 18 17.53"><path d="M16.845 7.615H3.942l5.637-5.637c0.45 -0.45 0.45 -1.19 0 -1.64 -0.45 -0.45 -1.178 -0.45 -1.629 0L0.338 7.95c-0.45 0.45 -0.45 1.179 0 1.629l7.612 7.612c0.451 0.451 1.179 0.451 1.63 0 0.45 -0.45 0.45 -1.178 0 -1.629L3.942 9.926h12.903c0.635 0 1.155 -0.52 1.155 -1.155 0 -0.636 -0.52 -1.156 -1.155 -1.156Z" fill="#1b2723" /></svg>
+        <svg width="12.7" height="10.9" viewBox="0 0 18 17.54"><path d="M1.155 9.926h12.903l-5.637 5.637c-0.45 0.45 -0.45 1.189 0 1.64 0.45 0.45 1.178 0.45 1.629 0l7.612 -7.612c0.45 -0.45 0.45 -1.179 0 -1.629L8.05 0.338c-0.45 -0.45 -1.179 -0.45 -1.629 0 -0.45 0.45 -0.45 1.179 0 1.629l5.636 5.648H1.155C0.52 7.615 0 8.135 0 8.77c0 0.636 0.52 1.156 1.155 1.156Z" fill="#a1bfb5" /></svg>
+        <svg width="12.7" height="10.9" viewBox="0 0 18 18"><path d="M18 6.497V1.207c0 -0.45 -0.54 -0.67 -0.85 -0.35l-1.78 1.78C13.557 0.827 10.977 -0.213 8.157 0.037c-4.19 0.38 -7.64 3.75 -8.1 7.94C-0.543 13.397 3.687 17.997 8.997 17.997c4.59 0 8.38 -3.44 8.93 -7.88 0.07 -0.6 -0.4 -1.12 -1 -1.12 -0.5 0 -0.92 0.37 -0.98 0.86 -0.43 3.49 -3.44 6.19 -7.05 6.14 -3.71 -0.05 -6.84 -3.18 -6.9 -6.9 -0.06 -3.9 3.11 -7.1 7 -7.1 1.93 0 3.68 0.79 4.95 2.05L11.857 6.137c-0.32 0.32 -0.1 0.86 0.35 0.86h5.29c0.28 0 0.5 -0.22 0.5 -0.5Z" fill="#a1bfb5" /></svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7.3, background: '#1b2723', height: 25.5, borderRadius: 18, paddingLeft: 10.9, paddingRight: 15.6, flex: 1, minWidth: 0, marginRight: 10.4 }}>
+          <svg width="9.1" height="10.9" viewBox="0 0 16 21" style={{ flexShrink: 0 }}><path d="M14 7h-1V5c0-2.76-2.24-5-5-5S3 2.24 3 5v2H2C0.9 7 0 7.9 0 9v10c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V9c0-1.1-0.9-2-2-2ZM8 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2ZM6 7V5c0-1.1.9-2 2-2s2 .9 2 2v2H6Z" fill="#ddf3ec" /></svg>
+          <span style={{ color: '#ddf3ec', fontSize: 17, fontFamily: 'Roboto, sans-serif', letterSpacing: '0.25px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {host}
             <span style={{ opacity: 0.7 }}>{path}</span>
           </span>
         </div>
-        <svg width="8.4" height="8.4" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
-        <svg width="8.4" height="8.4" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
-        <div style={{ width: 15.4, height: 15.4, borderRadius: '50%', background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 8 }}>
-          <svg width="7.7" height="9.1" viewBox="0 0 448 512"><path d="M224 256c33.9 0 65.5 -13.5 89.5 -37.5S352 161.9 352 128s-13.5 -65.5 -37.5 -89.5S257.9 0 224 0S158.5 13.5 134.5 37.5S96 94.1 96 128s13.5 65.5 37.5 89.5S190.1 256 224 256Zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512h388.6c16.4 0 29.7 -13.3 29.7 -29.7C448 383.8 368.2 304 269.7 304h-91.4Z" fill="#ddf3ec" /></svg>
+        <svg width="10.9" height="10.9" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
+        <svg width="10.9" height="10.9" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
+        <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 10.4 }}>
+          <svg width="10" height="11.8" viewBox="0 0 448 512"><path d="M224 256c33.9 0 65.5 -13.5 89.5 -37.5S352 161.9 352 128s-13.5 -65.5 -37.5 -89.5S257.9 0 224 0S158.5 13.5 134.5 37.5S96 94.1 96 128s13.5 65.5 37.5 89.5S190.1 256 224 256Zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512h388.6c16.4 0 29.7 -13.3 29.7 -29.7C448 383.8 368.2 304 269.7 304h-91.4Z" fill="#ddf3ec" /></svg>
         </div>
       </div>
       {/* Website body */}
-      <div style={{ height: 956, background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+      <div style={{ height: 939.2, background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
         <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=128`} alt="" width={33.6} height={33.6} onError={e => e.target.style.display = 'none'} style={{ borderRadius: 10, opacity: 0.9 }} />
         <span style={{ color: '#82b0a0', fontSize: 18, fontFamily: 'Roboto, sans-serif' }}>{display}</span>
         <span style={{ color: '#82b0a033', fontSize: 14 }}>Your site, ready for review</span>
