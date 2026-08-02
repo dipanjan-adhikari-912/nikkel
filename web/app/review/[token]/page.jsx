@@ -284,7 +284,7 @@ export default function ReviewPage({ params }) {
       <style>{`@keyframes nikkel-spin { to { transform: rotate(360deg) } }`}</style>
       <div style={{ position: 'absolute', top: -160, left: -180, width: 900, height: 720, background: '#aef0da33', filter: 'blur(180px)', pointerEvents: 'none' }} />
 
-      <div style={{ position: 'relative', maxWidth: 1480, margin: '0 auto', padding: '48px 32px 80px' }}>
+      <div style={{ position: 'relative', maxWidth: 1480, margin: '0 auto', padding: '48px 32px 80px', zoom: 0.7 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, marginBottom: 40, flexWrap: 'wrap' }}>
           <Wordmark width={150} />
           <span style={{ color: '#94c3b3', fontSize: 18 }}>feedback, without the friction.</span>
