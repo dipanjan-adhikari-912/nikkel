@@ -324,12 +324,12 @@ export default function ReviewPage({ params }) {
 
               {/* Feedback panel (413 wide, r24, gap 14, pad [28,17,31,17]) */}
               <div style={{ width: 413, flexShrink: 0, background: '#82b0a033', borderRadius: 24, padding: '28px 16.8px 31px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8.4 }}>
-                  <Avatar src={sender.avatar_url} name={sender.name} size={25} />
-                  <span style={{ color: '#ffffff', fontSize: 20 }}>{sender.name}</span>
-                </div>
-                <div style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>
-                  left feedback for you on this website.
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', rowGap: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8.4, flexShrink: 0 }}>
+                    <Avatar src={sender.avatar_url} name={sender.name} size={25} />
+                    <span style={{ color: '#ffffff', fontSize: 20 }}>{sender.name}</span>
+                  </div>
+                  <span style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>&nbsp;left feedback for you on this website.</span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
