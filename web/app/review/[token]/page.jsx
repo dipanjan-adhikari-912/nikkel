@@ -303,10 +303,10 @@ export default function ReviewPage({ params }) {
   const siteName = project.title || project.name || ''
 
   return (
-    <div style={{ minHeight: '100vh', background: '#101715', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '48px 24px' }}>
+    <div style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '48px 24px' }}>
       <style>{`@keyframes nikkel-spin { to { transform: rotate(360deg) } }`}</style>
       <div style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative' }}>
-        <div style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+        <div style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
 
           {/* Content (1905 wide, centered in the 2400 design) */}
           <div style={{ paddingLeft: 247.5 }}>
