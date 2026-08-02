@@ -66,9 +66,9 @@ function SeverityBadge({ severity }) {
   const cfg = SEVERITY[severity] || SEVERITY.medium
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5.6, background: '#82b0a033', borderRadius: 4, padding: '8px 5.6px', width: 'fit-content' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1.4, height: 19, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: 15, justifyContent: 'flex-end' }}>
         {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 8.4, height: 4.2, background: i < cfg.bars ? '#ddf3ec' : '#82b0a033' }} />
+          <div key={i} style={{ width: 8, height: 4, background: i < cfg.bars ? '#ddf3ec' : '#82b0a033' }} />
         ))}
       </div>
       <span style={{ color: '#ddf3ec', fontSize: 16, lineHeight: '22px' }}>{cfg.label}</span>
@@ -91,8 +91,10 @@ function CommentCard({ nikkel, sender }) {
         <span style={{ color: '#94c3b3', fontSize: 14, flexShrink: 0 }}>{timeAgo(nikkel.created_at)}</span>
       </div>
       {tag && (
-        <div style={{ color: '#71b9a1', fontFamily: 'Inconsolata, monospace', fontSize: 16 }}>
-          &lt;{tag}&gt;
+        <div style={{ background: '#131c19b3', border: '1px solid #72baa299', padding: 16, display: 'flex', alignItems: 'center' }}>
+          <span style={{ color: '#71b9a1', fontFamily: 'Inconsolata, monospace', fontSize: 16 }}>
+            &lt;{tag}&gt;
+          </span>
         </div>
       )}
       {elementText && (
@@ -310,10 +312,17 @@ export default function ReviewPage({ params }) {
 
           {/* Content (1905 wide, centered in the 2400 design) */}
           <div style={{ paddingLeft: 247.5 }}>
-            {/* Header: wordmark 105 + tagline */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24, paddingTop: 33.6 }}>
-              <Wordmark width={105} />
-              <span style={{ color: '#94c3b3', fontSize: 18 }}>feedback, without the friction.</span>
+            {/* Header: wordmark + tagline left, reviewer right */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 33.6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                <Wordmark width={105} />
+                <span style={{ color: '#dcf2ebff', fontSize: 18 }}>feedback, without the friction.</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Avatar src={sender.avatar_url} name={sender.name} size={25} />
+                <span style={{ color: '#ffffff', fontSize: 20, whiteSpace: 'nowrap', flexShrink: 0 }}>{sender.name}</span>
+                <span style={{ color: '#ffffff', fontSize: 20 }}>has left feedback for you on this website.</span>
+              </div>
             </div>
 
             {/* Browser + feedback panel */}
@@ -321,11 +330,12 @@ export default function ReviewPage({ params }) {
               <Browser url={pageUrl} siteName={siteName} screenshot={review?.screenshot_url} />
 
               {/* Feedback panel (413 wide, r24, gap 14, pad [28,17,31,17]) */}
-              <div style={{ width: 413, flexShrink: 0, background: '#82b0a033', borderRadius: 24, padding: '28px 16.8px 31px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8.4 }}>
-                  <Avatar src={sender.avatar_url} name={sender.name} size={25} />
-                  <span style={{ color: '#ffffff', fontSize: 20, whiteSpace: 'nowrap', flexShrink: 0 }}>{sender.name}</span>
-                  <span style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>left feedback for you on this website.</span>
+              <div style={{ width: 413, flexShrink: 0, background: '#82b0a033', borderRadius: 24, padding: '28px 16.8px 31px', display: 'flex', flexDirection: 'column', gap: 14, backdropFilter: 'blur(21px)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ color: '#1b2723', fontSize: 22 }}>n</span>
+                  </div>
+                  <span style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>reviews on this website</span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -345,7 +355,7 @@ export default function ReviewPage({ params }) {
                     disabled={opening}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: opening ? '#5ea388' : '#71b9a1', borderRadius: 19.4, height: 47.6, border: 'none', cursor: opening ? 'default' : 'pointer', padding: '0 16px' }}
                   >
-                    <span style={{ color: '#1b2723', fontSize: 22, fontWeight: 500 }}>
+                    <span style={{ color: '#1b2723', fontSize: 16, fontWeight: 500 }}>
                       {opening ? 'Opening...' : 'Review Feedback'}
                     </span>
                     <svg width="21" height="21" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -355,14 +365,14 @@ export default function ReviewPage({ params }) {
                     href="/download"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: '#71b9a1', borderRadius: 19.4, height: 47.6, textDecoration: 'none', padding: '0 16px' }}
                   >
-                    <span style={{ color: '#1b2723', fontSize: 22, fontWeight: 500 }}>
+                    <span style={{ color: '#1b2723', fontSize: 16, fontWeight: 500 }}>
                       {extensionState === false ? 'Install Nikkel' : 'Review Feedback'}
                     </span>
                     <svg width="21" height="21" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </a>
                 )}
 
-                <div style={{ color: '#ffffff', fontSize: 17, textAlign: 'center', lineHeight: 1.4 }}>
+                <div style={{ color: '#dcf2ebff', fontSize: 17, textAlign: 'center', lineHeight: 1.4 }}>
                   View and reply to comments, collaborate, and fix issues together.
                 </div>
               </div>
