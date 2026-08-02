@@ -712,6 +712,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         tab.review = review;
 
+        let screenshotUrl = review.screenshot_url || null;
+        if (!screenshotUrl) {
+          try {
+            const srcTab = await chrome.tabs.get(srcTabId);
+            if (srcTab?.windowId) {
+              screenshotUrl = await chrome.tabs.captureVisibleTab(srcTab.windowId, { format: 'jpeg', quality: 55 });
+              await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, { method: 'PATCH', token: globalState.token, body: JSON.stringify({ screenshot_url: screenshotUrl }) });
+            }
+          } catch (e) {
+            console.warn('[BG] SHARE: screenshot capture failed:', e.message);
+          }
+        }
+
         let shareToken = review.share_token;
         if (!shareToken) {
           const bytes = new Uint8Array(8); crypto.getRandomValues(bytes);

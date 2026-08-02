@@ -41,6 +41,7 @@ create table reviews (
   owner_id uuid not null default auth.uid() references auth.users on delete cascade,
   share_token text unique not null default encode(gen_random_bytes(16), 'hex'),
   visibility text default 'public' check (visibility in ('public', 'private')),
+  screenshot_url text,
   created_at timestamptz not null default now()
 );
 

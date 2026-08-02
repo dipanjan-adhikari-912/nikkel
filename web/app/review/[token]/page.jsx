@@ -110,7 +110,7 @@ function CommentCard({ nikkel, sender }) {
   )
 }
 
-function Browser({ url, siteName }) {
+function Browser({ url, siteName, screenshot }) {
   let host = ''
   let path = ''
   try {
@@ -155,9 +155,9 @@ function Browser({ url, siteName }) {
       </div>
       {/* Website body */}
       <div style={{ height: 939.2, background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', position: 'relative', overflow: 'hidden' }}>
-        {url ? (
+        {screenshot ? (
           <img
-            src={`https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1446`}
+            src={screenshot}
             alt=""
             onError={e => e.target.style.display = 'none'}
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
@@ -320,7 +320,7 @@ export default function ReviewPage({ params }) {
 
             {/* Browser + feedback panel */}
             <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start', marginTop: 28 }}>
-              <Browser url={pageUrl} siteName={siteName} />
+              <Browser url={pageUrl} siteName={siteName} screenshot={review?.screenshot_url} />
 
               {/* Feedback panel (413 wide, r24, gap 14, pad [28,17,31,17]) */}
               <div style={{ width: 413, flexShrink: 0, background: '#82b0a033', borderRadius: 24, padding: '28px 16.8px 31px', display: 'flex', flexDirection: 'column', gap: 14 }}>
