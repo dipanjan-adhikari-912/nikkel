@@ -150,7 +150,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     ts.barActive = true;
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
-      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
     });
   }
 });
@@ -176,7 +176,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
         await saveState();
         await sendToTab(tabId, {
           type: 'ACTIVATE',
-          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId, shareUrl: '', mode: 'annotate', readOnly: false, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
         });
       }
     } else if (ts.project && globalState.token) {
@@ -191,7 +191,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
           await saveState();
           await sendToTab(tabId, {
             type: 'ACTIVATE',
-            payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: 'annotate', readOnly: false, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: 'annotate', readOnly: false, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         }
       } catch {}
@@ -243,7 +243,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           await sendToTab(tId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         }
         return { ok: true, project, review };
@@ -291,7 +291,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (Array.isArray(existing) && existing.length > 0 && existing[0].idx != null) nextIdx = existing[0].idx + 1;
         } catch {}
         try {
-          const savedRes = await supabaseClient.request('/rest/v1/nikkels', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ review_id: tab.review.id, page_url: d.pageUrl, dom_selector: d.selector, x: d.pageX, y: d.pageY, viewport_w: d.viewportW, viewport_h: d.viewportH, tag: d.tag, element_text: d.elementText, comment: d.comment, idx: nextIdx, owner_id: globalState.user?.id }) });
+          const savedRes = await supabaseClient.request('/rest/v1/nikkels', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ review_id: tab.review.id, page_url: d.pageUrl, dom_selector: d.selector, x: d.pageX, y: d.pageY, viewport_w: d.viewportW, viewport_h: d.viewportH, tag: d.tag, element_text: d.elementText, screenshot_url: d.screenshotUrl || null, comment: d.comment, idx: nextIdx, owner_id: globalState.user?.id, severity: d.severity || 'medium', status: d.status || 'under_review' }) });
           const saved = Array.isArray(savedRes) ? savedRes[0] : savedRes;
           tab.nikkels.push(saved);
           await saveState();
@@ -299,7 +299,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return { ok: true };
         } catch (e) {
           console.warn('[Nikkel] create nikkel failed:', e.message);
-          return { ok: false, error: 'Could not save that pin — you may not have access to this project yet.' };
+          return { ok: false, error: `Could not save that pin: ${e.message}` };
+        }
+      }
+
+      case 'CAPTURE_SCREENSHOT': {
+        const capTabId = sender.tab?.id;
+        if (!capTabId) return { ok: false, error: 'No tab' };
+        try {
+          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'jpeg', quality: 40 });
+          return { ok: true, dataUrl };
+        } catch (e) {
+          console.warn('[Nikkel] captureVisibleTab failed:', e.message);
+          return { ok: false, error: e.message };
         }
       }
 
@@ -328,6 +340,88 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         ts.pendingScroll = { x: msg.payload.x, y: msg.payload.y };
         chrome.tabs.update(tId, { url: msg.payload.pageUrl });
         return { ok: true };
+      }
+
+      case 'UPDATE_NIKKEL': {
+        const srcTabId = sender.tab?.id;
+        if (!srcTabId) return { ok: false, error: 'No tab context' };
+        const tab = getTabState(srcTabId);
+        if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to update.' };
+        const { nikkelId, patch } = msg.payload || {};
+        if (!nikkelId || !patch || Object.keys(patch).length === 0) return { ok: false, error: 'Missing nikkelId or patch' };
+        const allowed = {};
+        if (patch.severity && ['low', 'medium', 'high'].includes(patch.severity)) allowed.severity = patch.severity;
+        if (patch.status && ['under_review', 'in_progress', 'resolved', 'not_considered'].includes(patch.status)) allowed.status = patch.status;
+        if (Object.keys(allowed).length === 0) return { ok: false, error: 'Nothing valid to update' };
+
+        const isOwner = globalState.user?.id && tab.project.owner_id === globalState.user.id;
+        if (!isOwner) {
+          const claimed = await ensureCollaborator(tab.project.id);
+          if (!claimed) return { ok: false, error: 'Could not verify project access. Try again.' };
+        }
+        try {
+          const savedRes = await supabaseClient.request(`/rest/v1/nikkels?id=eq.${nikkelId}`, { method: 'PATCH', token: globalState.token, prefer: 'return=representation', body: JSON.stringify(allowed) });
+          const saved = Array.isArray(savedRes) ? savedRes[0] : savedRes;
+          const idx = tab.nikkels.findIndex((n) => n.id === nikkelId);
+          if (idx !== -1) tab.nikkels[idx] = { ...tab.nikkels[idx], ...allowed };
+          await saveState();
+          return { ok: true, nikkel: saved || { id: nikkelId, ...allowed } };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
+      case 'DELETE_NIKKEL': {
+        const srcTabId = sender.tab?.id;
+        if (!srcTabId) return { ok: false, error: 'No tab context' };
+        const tab = getTabState(srcTabId);
+        if (!tab.project || !tab.review) return { ok: false, error: 'No active project or review' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to delete.' };
+        const { nikkelId } = msg.payload || {};
+        if (!nikkelId) return { ok: false, error: 'Missing nikkelId' };
+
+        const isOwner = globalState.user?.id && tab.project.owner_id === globalState.user.id;
+        if (!isOwner) {
+          const claimed = await ensureCollaborator(tab.project.id);
+          if (!claimed) return { ok: false, error: 'Could not verify project access. Try again.' };
+        }
+        try {
+          await supabaseClient.request(`/rest/v1/nikkels?id=eq.${nikkelId}`, { method: 'DELETE', token: globalState.token });
+          tab.nikkels = tab.nikkels.filter((n) => n.id !== nikkelId);
+          await saveState();
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      }
+
+      case 'SHARE_NIKKEL': {
+        const srcTabId = sender.tab?.id || tabId;
+        if (!srcTabId) return { ok: false, error: 'No tab context' };
+        const tab = getTabState(srcTabId);
+        if (!tab.project) return { ok: false, error: 'No active project' };
+        if (!globalState.token || !globalState.user?.email) return { ok: false, error: 'Sign in to share' };
+        const { nikkelId } = msg.payload || {};
+        if (!nikkelId) return { ok: false, error: 'Missing nikkelId' };
+        try {
+          let review = await supabaseClient.request(`/rest/v1/reviews?project_id=eq.${tab.project.id}&order=created_at.desc&limit=1`, { token: globalState.token }).then(r => Array.isArray(r) ? r[0] : null).catch(() => null);
+          if (!review) {
+            const reviewRes = await supabaseClient.request('/rest/v1/reviews', { method: 'POST', token: globalState.token, prefer: 'return=representation', body: JSON.stringify({ project_id: tab.project.id, owner_id: globalState.user?.id }) });
+            review = Array.isArray(reviewRes) ? reviewRes[0] : reviewRes;
+          }
+          let shareToken = review?.share_token;
+          if (!shareToken && review) {
+            const bytes = new Uint8Array(8); crypto.getRandomValues(bytes);
+            shareToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, { method: 'PATCH', token: globalState.token, body: JSON.stringify({ share_token: shareToken }) });
+          }
+          const nikkel = tab.nikkels.find((n) => n.id === nikkelId);
+          const anchor = nikkel ? `#nikkel-${nikkel.idx || ''}` : '';
+          return { ok: true, shareUrl: `${VIEWER_BASE}/review/${shareToken}${anchor}` };
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
       }
 
       case 'GET_PENDING_SCROLL': {
@@ -464,7 +558,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (tab.project) {
             await sendToTab(tId, {
               type: 'ACTIVATE',
-              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
             });
           }
         }
@@ -585,7 +679,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           stateForTab.nikkels = nikkels;
           await sendToTab(tab.id, {
             type: 'LOAD_SESSION',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: stateForTab.readOnly, nikkels, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: stateForTab.readOnly, nikkels, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         } catch {}
         return { ok: true, targetUrl, reused };

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@paper-design/shaders-react": "^0.0.78",
     "keyboard-css": "^1.2.4"
   }
 }

@@ -51,7 +51,10 @@ Full protocol tables are documented in the existing file below. Key types:
 - `ACTIVATE_TAB` — re-sends ACTIVATE to tab if project exists
 
 ### Content → Background
-- `SUBMIT_NIKKEL` — validates project access, computes `idx = max+1`, calls `pinService.create`
+- `SUBMIT_NIKKEL` — validates project access, computes `idx = max+1`, calls `pinService.create`. Accepts `severity`/`status` (defaults `medium`/`under_review`).
+- `UPDATE_NIKKEL` — PATCH `severity`/`status` (validated whitelist) via `/rest/v1/nikkels?id=eq.<id>`, owner/collaborator gated
+- `DELETE_NIKKEL` — DELETE nikkel via Supabase, owner/collaborator gated
+- `SHARE_NIKKEL` — ensures review + share token, returns `${VIEWER_BASE}/review/<token>#nikkel-<idx>`
 - `MODE_CHANGED` — entering annotate mode exits annotate on all other tabs
 - `GET_NIKKELS` `{ pageUrl }` — filtered by pageUrl; pass `{ allPages: true }` to skip filter
 

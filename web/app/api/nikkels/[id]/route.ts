@@ -20,14 +20,27 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
-  const { status } = await request.json()
-  if (!status || !['open', 'in_progress', 'resolved'].includes(status)) {
-    return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+  const body = await request.json()
+  const patch: Record<string, unknown> = {}
+  if ('status' in body) {
+    if (!['under_review', 'in_progress', 'resolved', 'not_considered'].includes(body.status)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    }
+    patch.status = body.status
+  }
+  if ('severity' in body) {
+    if (!['low', 'medium', 'high'].includes(body.severity)) {
+      return NextResponse.json({ error: 'Invalid severity' }, { status: 400 })
+    }
+    patch.severity = body.severity
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }
 
   const { data, error } = await db
     .from('nikkels')
-    .update({ status })
+    .update(patch)
     .eq('id', params.id)
     .select()
     .single()
