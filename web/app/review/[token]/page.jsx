@@ -8,6 +8,9 @@ const SEVERITY = {
   high: { label: 'High Priority', bars: 3 },
 }
 
+// Exact proportions from the pencil `review_page` design (frame P5XGFV, 2400×1505)
+const DESIGN_W = 2400
+
 function timeAgo(iso) {
   if (!iso) return ''
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -21,7 +24,7 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function Avatar({ src, name, size = 36 }) {
+function Avatar({ src, name, size = 25 }) {
   const initials = (name || '?')
     .split(/\s+/)
     .map(w => w[0])
@@ -49,7 +52,7 @@ const WORDMARK = [
   { d: 'M27.91633 20.064863C28.709408 18.320093 29.105947 16.443142 29.105947 14.434013C29.105947 12.477756 28.709408 10.62724 27.91633 8.8824692C27.176125 7.0848265 26.145124 5.5515437 24.823328 4.2826195C23.501532 2.9608235 21.941813 1.9298229 20.144171 1.1896172C18.399401 0.39653951 16.522449 0 14.51332 0C12.50419 0 10.600803 0.39653951 8.8031607 1.1896172C7.0583901 1.9298229 5.5251069 2.9608235 4.203311 4.2826195C2.9343867 5.5515437 1.9033862 7.0848265 1.1103086 8.8824692C0.37010288 10.62724 0 12.477756 0 14.434013C0 16.443142 0.37010288 18.320093 1.1103086 20.064863C1.9033862 21.809633 2.9343867 23.342918 4.203311 24.664715C5.5251069 25.93364 7.0583901 26.96464 8.8031607 27.757717C10.600803 28.497923 12.50419 28.868025 14.51332 28.868025C16.522449 28.868025 18.399401 28.497923 20.144171 27.757717C21.941813 26.96464 23.501532 25.93364 24.823328 24.664715C26.145124 23.342918 27.176125 21.809633 27.91633 20.064863Z', x: 52.791, y: 0.18, w: 19.256, h: 19.114, vbW: 29.105947494506836, vbH: 28.868024826049805, fill: '#71b9a1' },
 ]
 
-function Wordmark({ width = 160 }) {
+function Wordmark({ width = 105 }) {
   return (
     <svg viewBox="0 0 244 75" width={width} height={width * (75 / 244)} fill="none" style={{ display: 'block' }}>
       {WORDMARK.map((p, i) => (
@@ -62,10 +65,10 @@ function Wordmark({ width = 160 }) {
 function SeverityBadge({ severity }) {
   const cfg = SEVERITY[severity] || SEVERITY.medium
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#82b0a033', borderRadius: 4, padding: 8, width: 'fit-content' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, height: 22, justifyContent: 'flex-end' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5.6, background: '#82b0a033', borderRadius: 4, padding: '8px 5.6px', width: 'fit-content' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1.4, height: 19, justifyContent: 'flex-end' }}>
         {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 12, height: 6, background: i < cfg.bars ? '#ddf3ec' : '#82b0a033' }} />
+          <div key={i} style={{ width: 8.4, height: 4.2, background: i < cfg.bars ? '#ddf3ec' : '#82b0a033' }} />
         ))}
       </div>
       <span style={{ color: '#ddf3ec', fontSize: 16, lineHeight: '22px' }}>{cfg.label}</span>
@@ -77,28 +80,26 @@ function CommentCard({ nikkel, sender }) {
   const tag = nikkel.tag || (nikkel.element_text ? 'element' : null)
   const elementText = (nikkel.element_text || '').slice(0, 80)
   return (
-    <div style={{ background: '#82b0a033', borderRadius: 12, padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-          <Avatar src={sender?.avatar_url} name={sender?.name} size={36} />
+    <div style={{ background: '#82b0a033', borderRadius: 12, padding: '11.2px 16.8px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8.4, minWidth: 0 }}>
+          <Avatar src={sender?.avatar_url} name={sender?.name} size={25} />
           <span style={{ color: '#94c3b3', fontSize: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {sender?.name || 'Guest'}
           </span>
         </div>
         <span style={{ color: '#94c3b3', fontSize: 14, flexShrink: 0 }}>{timeAgo(nikkel.created_at)}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        {tag && (
-          <span style={{ color: '#71b9a1', fontFamily: 'Inconsolata, monospace', fontSize: 16, flexShrink: 0 }}>
-            &lt;{tag}&gt;
-          </span>
-        )}
-        {elementText && (
-          <span style={{ color: '#ffffff', fontFamily: 'Inconsolata, monospace', fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {elementText}
-          </span>
-        )}
-      </div>
+      {tag && (
+        <div style={{ color: '#71b9a1', fontFamily: 'Inconsolata, monospace', fontSize: 16 }}>
+          &lt;{tag}&gt;
+        </div>
+      )}
+      {elementText && (
+        <div style={{ color: '#ffffff', fontFamily: 'Inconsolata, monospace', fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {elementText}
+        </div>
+      )}
       {nikkel.comment && (
         <p style={{ margin: 0, color: '#ffffff', fontSize: 18, lineHeight: 1.35, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {nikkel.comment}
@@ -120,41 +121,41 @@ function Browser({ url, siteName }) {
   const display = host || url || 'yourwebsite.com'
   const site = siteName || host || 'Your Website'
   return (
-    <div style={{ background: '#82b0a033', borderRadius: 24, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.35)' }}>
-      {/* Browser controls */}
-      <div style={{ background: '#1b2723', height: 42, display: 'flex', alignItems: 'center', gap: 16, padding: '0 13px', borderRadius: '8px 8px 0 0' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff6058' }} />
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffc130' }} />
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27ca40' }} />
+    <div style={{ width: 1446, height: 1012, background: '#82b0a033', borderRadius: 24, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.35)', flexShrink: 0 }}>
+      {/* Toolbar (29.4px, #1b2723) */}
+      <div style={{ height: 29.4, background: '#1b2723', display: 'flex', alignItems: 'center', paddingLeft: 9.1, gap: 11.2 }}>
+        <div style={{ display: 'flex', gap: 5.6 }}>
+          <span style={{ width: 8.4, height: 8.4, borderRadius: '50%', background: '#ff6058' }} />
+          <span style={{ width: 8.4, height: 8.4, borderRadius: '50%', background: '#ffc130' }} />
+          <span style={{ width: 8.4, height: 8.4, borderRadius: '50%', background: '#27ca40' }} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#ddf3ec', height: 34, padding: '0 8px', borderRadius: '8px 8px 0 0', minWidth: 0 }}>
-          <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`} alt="" width={16} height={16} onError={e => e.target.style.display = 'none'} style={{ flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6.3, background: '#ddf3ec', height: 23.8, padding: '0 5.6px', borderRadius: '8px 8px 0 0', minWidth: 0, maxWidth: 200 }}>
+          <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`} alt="" width={11.2} height={11.2} onError={e => e.target.style.display = 'none'} style={{ flexShrink: 0 }} />
           <span style={{ color: '#1b2723', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{site}</span>
-          <svg width="10" height="10" viewBox="0 0 10 10" style={{ flexShrink: 0 }}><path d="M9.778 0.229C9.482 -0.066 9.004 -0.066 8.709 0.229L5 3.931L1.291 0.222C0.995 -0.074 0.518 -0.074 0.222 0.222C-0.074 0.518 -0.074 0.995 0.222 1.291L3.931 5L0.222 8.708C-0.074 9.004 -0.074 9.482 0.222 9.778C0.518 10.074 0.995 10.074 1.291 9.778L5 6.069L8.708 9.778C9.004 10.074 9.482 10.074 9.778 9.778C10.074 9.482 10.074 9.004 9.778 8.708L6.069 5L9.778 1.291C10.066 1.003 10.066 0.518 9.778 0.229Z" fill="#1b2723" /></svg>
+          <svg width="7" height="7" viewBox="0 0 10 10" style={{ flexShrink: 0 }}><path d="M9.778 0.229C9.482 -0.066 9.004 -0.066 8.709 0.229L5 3.931L1.291 0.222C0.995 -0.074 0.518 -0.074 0.222 0.222C-0.074 0.518 -0.074 0.995 0.222 1.291L3.931 5L0.222 8.708C-0.074 9.004 -0.074 9.482 0.222 9.778C0.518 10.074 0.995 10.074 1.291 9.778L5 6.069L8.708 9.778C9.004 10.074 9.482 10.074 9.778 9.778C10.074 9.482 10.074 9.004 9.778 8.708L6.069 5L9.778 1.291C10.066 1.003 10.066 0.518 9.778 0.229Z" fill="#1b2723" /></svg>
         </div>
       </div>
-      {/* URL bar */}
-      <div style={{ background: '#ddf3ec', height: 38, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px' }}>
-        <svg width="14" height="12" viewBox="0 0 18 17.53" style={{ flexShrink: 0 }}><path d="M16.845 7.615H3.942l5.637-5.637c0.45 -0.45 0.45 -1.19 0 -1.64 -0.45 -0.45 -1.178 -0.45 -1.629 0L0.338 7.95c-0.45 0.45 -0.45 1.179 0 1.629l7.612 7.612c0.451 0.451 1.179 0.451 1.63 0 0.45 -0.45 0.45 -1.178 0 -1.629L3.942 9.926h12.903c0.635 0 1.155 -0.52 1.155 -1.155 0 -0.636 -0.52 -1.156 -1.155 -1.156Z" fill="#1b2723" /></svg>
-        <svg width="14" height="12" viewBox="0 0 18 17.54" style={{ flexShrink: 0 }}><path d="M1.155 9.926h12.903l-5.637 5.637c-0.45 0.45 -0.45 1.189 0 1.64 0.45 0.45 1.178 0.45 1.629 0l7.612 -7.612c0.45 -0.45 0.45 -1.179 0 -1.629L8.05 0.338c-0.45 -0.45 -1.179 -0.45 -1.629 0 -0.45 0.45 -0.45 1.179 0 1.629l5.636 5.648H1.155C0.52 7.615 0 8.135 0 8.77c0 0.636 0.52 1.156 1.155 1.156Z" fill="#a1bfb5" /></svg>
-        <svg width="14" height="12" viewBox="0 0 18 18" style={{ flexShrink: 0 }}><path d="M18 6.497V1.207c0 -0.45 -0.54 -0.67 -0.85 -0.35l-1.78 1.78C13.557 0.827 10.977 -0.213 8.157 0.037c-4.19 0.38 -7.64 3.75 -8.1 7.94C-0.543 13.397 3.687 17.997 8.997 17.997c4.59 0 8.38 -3.44 8.93 -7.88 0.07 -0.6 -0.4 -1.12 -1 -1.12 -0.5 0 -0.92 0.37 -0.98 0.86 -0.43 3.49 -3.44 6.19 -7.05 6.14 -3.71 -0.05 -6.84 -3.18 -6.9 -6.9 -0.06 -3.9 3.11 -7.1 7 -7.1 1.93 0 3.68 0.79 4.95 2.05L11.857 6.137c-0.32 0.32 -0.1 0.86 0.35 0.86h5.29c0.28 0 0.5 -0.22 0.5 -0.5Z" fill="#a1bfb5" /></svg>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: '#1b2723', height: 28, borderRadius: 14, padding: '0 12px', minWidth: 0 }}>
-          <svg width="10" height="12" viewBox="0 0 16 21" style={{ flexShrink: 0 }}><path d="M14 7h-1V5c0-2.76-2.24-5-5-5S3 2.24 3 5v2H2C0.9 7 0 7.9 0 9v10c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V9c0-1.1-0.9-2-2-2ZM8 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2ZM6 7V5c0-1.1.9-2 2-2s2 .9 2 2v2H6Z" fill="#ddf3ec" /></svg>
+      {/* URL bar (26.6px, #ddf3ec) */}
+      <div style={{ height: 26.6, background: '#ddf3ec', display: 'flex', alignItems: 'center', paddingLeft: 8.4, gap: 15.4 }}>
+        <svg width="9.8" height="8.4" viewBox="0 0 18 17.53"><path d="M16.845 7.615H3.942l5.637-5.637c0.45 -0.45 0.45 -1.19 0 -1.64 -0.45 -0.45 -1.178 -0.45 -1.629 0L0.338 7.95c-0.45 0.45 -0.45 1.179 0 1.629l7.612 7.612c0.451 0.451 1.179 0.451 1.63 0 0.45 -0.45 0.45 -1.178 0 -1.629L3.942 9.926h12.903c0.635 0 1.155 -0.52 1.155 -1.155 0 -0.636 -0.52 -1.156 -1.155 -1.156Z" fill="#1b2723" /></svg>
+        <svg width="9.8" height="8.4" viewBox="0 0 18 17.54"><path d="M1.155 9.926h12.903l-5.637 5.637c-0.45 0.45 -0.45 1.189 0 1.64 0.45 0.45 1.178 0.45 1.629 0l7.612 -7.612c0.45 -0.45 0.45 -1.179 0 -1.629L8.05 0.338c-0.45 -0.45 -1.179 -0.45 -1.629 0 -0.45 0.45 -0.45 1.179 0 1.629l5.636 5.648H1.155C0.52 7.615 0 8.135 0 8.77c0 0.636 0.52 1.156 1.155 1.156Z" fill="#a1bfb5" /></svg>
+        <svg width="9.8" height="8.4" viewBox="0 0 18 18"><path d="M18 6.497V1.207c0 -0.45 -0.54 -0.67 -0.85 -0.35l-1.78 1.78C13.557 0.827 10.977 -0.213 8.157 0.037c-4.19 0.38 -7.64 3.75 -8.1 7.94C-0.543 13.397 3.687 17.997 8.997 17.997c4.59 0 8.38 -3.44 8.93 -7.88 0.07 -0.6 -0.4 -1.12 -1 -1.12 -0.5 0 -0.92 0.37 -0.98 0.86 -0.43 3.49 -3.44 6.19 -7.05 6.14 -3.71 -0.05 -6.84 -3.18 -6.9 -6.9 -0.06 -3.9 3.11 -7.1 7 -7.1 1.93 0 3.68 0.79 4.95 2.05L11.857 6.137c-0.32 0.32 -0.1 0.86 0.35 0.86h5.29c0.28 0 0.5 -0.22 0.5 -0.5Z" fill="#a1bfb5" /></svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5.6, background: '#1b2723', height: 19.6, borderRadius: 14, paddingLeft: 8.4, paddingRight: 12, flex: 1, minWidth: 0, marginRight: 8 }}>
+          <svg width="7" height="8.4" viewBox="0 0 16 21" style={{ flexShrink: 0 }}><path d="M14 7h-1V5c0-2.76-2.24-5-5-5S3 2.24 3 5v2H2C0.9 7 0 7.9 0 9v10c0 1.1 0.9 2 2 2h12c1.1 0 2-0.9 2-2V9c0-1.1-0.9-2-2-2ZM8 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2ZM6 7V5c0-1.1.9-2 2-2s2 .9 2 2v2H6Z" fill="#ddf3ec" /></svg>
           <span style={{ color: '#ddf3ec', fontSize: 13, fontFamily: 'Roboto, sans-serif', letterSpacing: '0.25px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {host}
             <span style={{ opacity: 0.7 }}>{path}</span>
           </span>
         </div>
-        <svg width="12" height="12" viewBox="0 0 18 17.21" style={{ flexShrink: 0 }}><path d="M17.043 5.76l-5.09 -0.442 -1.987 -4.68c-0.358 -0.851 -1.577 -0.851 -1.935 0l-1.988 4.69 -5.079 0.432c-0.925 0.074 -1.304 1.23 -0.599 1.84l3.859 3.344 -1.156 4.963c-0.21 0.905 0.768 1.62 1.567 1.136l4.364 -2.629 4.364 2.64c0.799 0.483 1.777 -0.202 1.567 -1.136l-1.157 -4.964 3.86 -3.344c0.704 -0.61 0.336 -1.766 -0.589 -1.84Z" fill="#5f6368" /></svg>
-        <svg width="12" height="12" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
-        <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <svg width="11" height="13" viewBox="0 0 448 512"><path d="M224 256c33.9 0 65.5 -13.5 89.5 -37.5S352 161.9 352 128s-13.5 -65.5 -37.5 -89.5S257.9 0 224 0S158.5 13.5 134.5 37.5S96 94.1 96 128s13.5 65.5 37.5 89.5S190.1 256 224 256Zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512h388.6c16.4 0 29.7 -13.3 29.7 -29.7C448 383.8 368.2 304 269.7 304h-91.4Z" fill="#ddf3ec" /></svg>
+        <svg width="8.4" height="8.4" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
+        <svg width="8.4" height="8.4" viewBox="0 0 4.5 4.5" style={{ flexShrink: 0 }}><circle cx="2.25" cy="0.75" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="2.25" r="0.75" fill="#5f6368" /><circle cx="2.25" cy="3.75" r="0.75" fill="#5f6368" /></svg>
+        <div style={{ width: 15.4, height: 15.4, borderRadius: '50%', background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 8 }}>
+          <svg width="7.7" height="9.1" viewBox="0 0 448 512"><path d="M224 256c33.9 0 65.5 -13.5 89.5 -37.5S352 161.9 352 128s-13.5 -65.5 -37.5 -89.5S257.9 0 224 0S158.5 13.5 134.5 37.5S96 94.1 96 128s13.5 65.5 37.5 89.5S190.1 256 224 256Zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512h388.6c16.4 0 29.7 -13.3 29.7 -29.7C448 383.8 368.2 304 269.7 304h-91.4Z" fill="#ddf3ec" /></svg>
         </div>
       </div>
       {/* Website body */}
-      <div style={{ aspectRatio: '1524 / 928', background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-        <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=128`} alt="" width={48} height={48} onError={e => e.target.style.display = 'none'} style={{ borderRadius: 10, opacity: 0.9 }} />
+      <div style={{ height: 956, background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+        <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=128`} alt="" width={33.6} height={33.6} onError={e => e.target.style.display = 'none'} style={{ borderRadius: 10, opacity: 0.9 }} />
         <span style={{ color: '#82b0a0', fontSize: 18, fontFamily: 'Roboto, sans-serif' }}>{display}</span>
         <span style={{ color: '#82b0a033', fontSize: 14 }}>Your site, ready for review</span>
       </div>
@@ -189,6 +190,17 @@ export default function ReviewPage({ params }) {
   const [extensionState, setExtensionState] = useState(null) // null=checking, true=installed, false=not installed
   const [opening, setOpening] = useState(false)
   const [openingError, setOpeningError] = useState(null)
+  const [scale, setScale] = useState(0.8)
+
+  useEffect(() => {
+    function updateScale() {
+      const fit = (window.innerWidth - 48) / DESIGN_W
+      setScale(Math.min(1, Math.max(0.4, fit)))
+    }
+    updateScale()
+    window.addEventListener('resize', updateScale)
+    return () => window.removeEventListener('resize', updateScale)
+  }, [])
 
   useEffect(() => {
     if (document.documentElement.dataset.nikkelInstalled) {
@@ -280,75 +292,80 @@ export default function ReviewPage({ params }) {
   const siteName = project.title || project.name || ''
 
   return (
-    <div style={{ minHeight: '100vh', background: '#101715', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', position: 'relative', overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: '#101715', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '48px 24px' }}>
       <style>{`@keyframes nikkel-spin { to { transform: rotate(360deg) } }`}</style>
-      <div style={{ position: 'absolute', top: -160, left: -180, width: 900, height: 720, background: '#aef0da33', filter: 'blur(180px)', pointerEvents: 'none' }} />
+      <div style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative' }}>
+        <div style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          {/* Decorative blurred blob */}
+          <div style={{ position: 'absolute', left: -362, top: 145, width: 1889, height: 1406, background: '#aef0da33', filter: 'blur(218.75px)', pointerEvents: 'none' }} />
 
-      <div style={{ position: 'relative', maxWidth: 1480, margin: '0 auto', padding: '48px 32px 80px', zoom: 0.7 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, marginBottom: 40, flexWrap: 'wrap' }}>
-          <Wordmark width={150} />
-          <span style={{ color: '#94c3b3', fontSize: 18 }}>feedback, without the friction.</span>
-        </div>
-
-        <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
-          {/* Browser mockup */}
-          <div style={{ flex: '1 1 0', minWidth: 0 }}>
-            <Browser url={pageUrl} siteName={siteName} />
-          </div>
-
-          {/* Feedback panel */}
-          <div style={{ flex: '0 0 506px', maxWidth: '100%', background: '#82b0a033', borderRadius: 24, padding: '40px 24px 44px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Avatar src={sender.avatar_url} name={sender.name} size={36} />
-              <span style={{ color: '#ffffff', fontSize: 20 }}>{sender.name}</span>
-            </div>
-            <div style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>
-              left feedback for you on this website.
+          {/* Content (1905 wide, centered in the 2400 design) */}
+          <div style={{ paddingLeft: 247.5 }}>
+            {/* Header: wordmark 105 + tagline */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24, paddingTop: 33.6 }}>
+              <Wordmark width={105} />
+              <span style={{ color: '#94c3b3', fontSize: 18 }}>feedback, without the friction.</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {(nikkels || []).map(nikkel => (
-                <CommentCard key={nikkel.id} nikkel={nikkel} sender={sender} />
-              ))}
-              {(nikkels || []).length === 0 && (
-                <div style={{ background: '#82b0a033', borderRadius: 12, padding: '24px', color: '#94c3b3', textAlign: 'center', fontSize: 16 }}>
-                  No feedback yet on this site.
+            {/* Browser + feedback panel */}
+            <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start', marginTop: 28 }}>
+              <Browser url={pageUrl} siteName={siteName} />
+
+              {/* Feedback panel (413 wide, r24, gap 14, pad [28,17,31,17]) */}
+              <div style={{ width: 413, flexShrink: 0, background: '#82b0a033', borderRadius: 24, padding: '28px 16.8px 31px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8.4 }}>
+                  <Avatar src={sender.avatar_url} name={sender.name} size={25} />
+                  <span style={{ color: '#ffffff', fontSize: 20 }}>{sender.name}</span>
                 </div>
-              )}
+                <div style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>
+                  left feedback for you on this website.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {(nikkels || []).map(nikkel => (
+                    <CommentCard key={nikkel.id} nikkel={nikkel} sender={sender} />
+                  ))}
+                  {(nikkels || []).length === 0 && (
+                    <div style={{ background: '#82b0a033', borderRadius: 12, padding: '20px', color: '#94c3b3', textAlign: 'center', fontSize: 17 }}>
+                      No feedback yet on this site.
+                    </div>
+                  )}
+                </div>
+
+                {extensionState === true ? (
+                  <button
+                    onClick={handleOpenReview}
+                    disabled={opening}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: opening ? '#5ea388' : '#71b9a1', borderRadius: 19.4, height: 47.6, border: 'none', cursor: opening ? 'default' : 'pointer', padding: '0 16px' }}
+                  >
+                    <span style={{ color: '#1b2723', fontSize: 22, fontWeight: 500 }}>
+                      {opening ? 'Opening...' : 'Review Feedback'}
+                    </span>
+                    <svg width="21" height="21" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                ) : (
+                  <a
+                    href="/download"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: '#71b9a1', borderRadius: 19.4, height: 47.6, textDecoration: 'none', padding: '0 16px' }}
+                  >
+                    <span style={{ color: '#1b2723', fontSize: 22, fontWeight: 500 }}>
+                      {extensionState === false ? 'Install Nikkel' : 'Review Feedback'}
+                    </span>
+                    <svg width="21" height="21" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </a>
+                )}
+
+                <div style={{ color: '#ffffff', fontSize: 17, textAlign: 'center', lineHeight: 1.4 }}>
+                  View and reply to comments, collaborate, and fix issues together.
+                </div>
+              </div>
             </div>
 
-            {extensionState === true ? (
-              <button
-                onClick={handleOpenReview}
-                disabled={opening}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: opening ? '#5ea388' : '#71b9a1', borderRadius: 19.4, height: 68, border: 'none', cursor: opening ? 'default' : 'pointer', padding: '0 16px' }}
-              >
-                <span style={{ color: '#1b2723', fontSize: 22, fontWeight: 500 }}>
-                  {opening ? 'Opening...' : 'Review Feedback'}
-                </span>
-                <svg width="30" height="30" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </button>
-            ) : (
-              <a
-                href="/download"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#71b9a1', borderRadius: 19.4, height: 68, textDecoration: 'none', padding: '0 16px' }}
-              >
-                <span style={{ color: '#1b2723', fontSize: 22, fontWeight: 500 }}>
-                  {extensionState === false ? 'Install Nikkel' : 'Review Feedback'}
-                </span>
-                <svg width="30" height="30" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </a>
+            {openingError && (
+              <p style={{ color: '#f87171', fontSize: 18, textAlign: 'center', margin: '12px 0 0' }}>{openingError}</p>
             )}
-
-            <div style={{ color: '#ffffff', fontSize: 17, textAlign: 'center', lineHeight: 1.4 }}>
-              View and reply to comments, collaborate, and fix issues together.
-            </div>
           </div>
         </div>
-
-        {openingError && (
-          <p style={{ color: '#f87171', fontSize: 14, margin: '24px 0 0', textAlign: 'center' }}>{openingError}</p>
-        )}
       </div>
     </div>
   )
