@@ -717,7 +717,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           try {
             const srcTab = await chrome.tabs.get(srcTabId);
             if (srcTab?.windowId) {
+              const HIDE_CSS = '[id^="nikkel-"] { display: none !important; }';
+              let injected = false;
+              try {
+                await chrome.scripting.insertCSS({ target: { tabId: srcTabId }, css: HIDE_CSS });
+                injected = true;
+                await new Promise(r => setTimeout(r, 150));
+              } catch {}
               screenshotUrl = await chrome.tabs.captureVisibleTab(srcTab.windowId, { format: 'jpeg', quality: 55 });
+              if (injected) {
+                try { await chrome.scripting.removeCSS({ target: { tabId: srcTabId }, css: HIDE_CSS }); } catch {}
+              }
               await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, { method: 'PATCH', token: globalState.token, body: JSON.stringify({ screenshot_url: screenshotUrl }) });
             }
           } catch (e) {
