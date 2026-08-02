@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { FlutedGlass } from '@paper-design/shaders-react'
 
 const SEVERITY = {
   low: { label: 'Low Priority', bars: 1 },
@@ -303,16 +304,32 @@ export default function ReviewPage({ params }) {
   const siteName = project.title || project.name || ''
 
   return (
-    <div style={{ minHeight: '100vh', background: '#101715', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '48px 24px' }}>
+    <div style={{ minHeight: '100vh', background: '#101715', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '48px 24px', position: 'relative' }}>
       <style>{`@keyframes nikkel-spin { to { transform: rotate(360deg) } }`}</style>
-      <div style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative' }}>
+      {/* Fluted-glass shader backdrop */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.35 }}>
+        <FlutedGlass
+          colorBack="#101715"
+          colorShadow="#6366f1"
+          colorHighlight="#aef0da"
+          shadows={0.4}
+          highlights={0.15}
+          size={0.45}
+          distortion={0.55}
+          distortionShape="cascade"
+          shape="linesIrregular"
+          blur={0.15}
+          edges={0.5}
+          stretch={0.3}
+          grainOverlay={0.05}
+          fit="cover"
+          scale={1.4}
+          rotation={0}
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
+      <div style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative', zIndex: 1 }}>
         <div style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-          {/* Frosted-glass backdrop blobs */}
-          <div style={{ position: 'absolute', left: -362, top: 145, width: 1889, height: 1406, background: '#aef0da33', filter: 'blur(218.75px)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', left: 1950, top: -150, width: 900, height: 700, background: '#6366f126', filter: 'blur(180px)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', left: 900, top: 1150, width: 1100, height: 600, background: '#71b9a130', filter: 'blur(200px)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', left: -300, top: 900, width: 800, height: 700, background: '#4f46e520', filter: 'blur(190px)', pointerEvents: 'none' }} />
-
           {/* Content (1905 wide, centered in the 2400 design) */}
           <div style={{ paddingLeft: 247.5 }}>
             {/* Header: wordmark 105 + tagline */}
