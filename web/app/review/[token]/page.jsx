@@ -154,10 +154,21 @@ function Browser({ url, siteName }) {
         </div>
       </div>
       {/* Website body */}
-      <div style={{ height: 939.2, background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-        <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=128`} alt="" width={33.6} height={33.6} onError={e => e.target.style.display = 'none'} style={{ borderRadius: 10, opacity: 0.9 }} />
-        <span style={{ color: '#82b0a0', fontSize: 18, fontFamily: 'Roboto, sans-serif' }}>{display}</span>
-        <span style={{ color: '#82b0a033', fontSize: 14 }}>Your site, ready for review</span>
+      <div style={{ height: 939.2, background: 'linear-gradient(160deg, #1b2723 0%, #101715 60%, #0c120f 100%)', position: 'relative', overflow: 'hidden' }}>
+        {url ? (
+          <img
+            src={`https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1446`}
+            alt=""
+            onError={e => e.target.style.display = 'none'}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
+          />
+        ) : (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+            <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=128`} alt="" width={33.6} height={33.6} onError={e => e.target.style.display = 'none'} style={{ borderRadius: 10, opacity: 0.9 }} />
+            <span style={{ color: '#82b0a0', fontSize: 18, fontFamily: 'Roboto, sans-serif' }}>{display}</span>
+            <span style={{ color: '#82b0a033', fontSize: 14 }}>Your site, ready for review</span>
+          </div>
+        )}
       </div>
     </div>
   )
