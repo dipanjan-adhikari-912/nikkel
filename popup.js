@@ -35,6 +35,12 @@ async function init() {
   const tabId = tab?.id;
   let state = await bg({ type: 'GET_STATE', payload: { tabId } });
 
+  if (state.globalDisabled) {
+    showView('vDisabled');
+    $('userRow').classList.remove('show');
+    return;
+  }
+
   if (tabId) {
     try {
       const ctx = await chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_CONTEXT' });
@@ -47,12 +53,6 @@ async function init() {
   if (!state.title && tab?.title) state.title = tab.title;
 
   console.log('[Popup] GET_STATE', state);
-
-  if (state.globalDisabled) {
-    showView('vDisabled');
-    $('userRow').classList.remove('show');
-    return;
-  }
 
   updateUserRow(state);
 
@@ -71,6 +71,12 @@ async function init() {
 $('powerBtn').addEventListener('click', async () => {
   const tab = await getActiveTab();
   await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: false, tabId: tab?.id } });
+  init();
+});
+
+$('vauthPowerOff').addEventListener('click', async () => {
+  const tab = await getActiveTab();
+  await bg({ type: 'TOGGLE_DISABLED', payload: { disabled: true, tabId: tab?.id } });
   init();
 });
 

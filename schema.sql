@@ -136,6 +136,8 @@ create table nikkels (
   comment text not null,
   idx integer not null,
   screenshot_url text,
+  severity text not null default 'medium' check (severity in ('low', 'medium', 'high')),
+  status text not null default 'under_review' check (status in ('under_review', 'in_progress', 'resolved', 'not_considered')),
   created_at timestamptz not null default now()
 );
 
@@ -159,9 +161,33 @@ create policy "owner_or_collaborator_can_add_nikkels"
     )
   );
 
-create policy "Owners can update nikkels"
+create policy "owner_or_collaborator_can_update_nikkels"
   on nikkels for update
-  using (auth.uid() = owner_id);
+  using (
+    exists (
+      select 1 from reviews r
+      join projects p on p.id = r.project_id
+      where r.id = review_id
+        and (
+          p.owner_id = auth.uid()
+          or exists (select 1 from project_collaborators c where c.project_id = p.id and c.user_id = auth.uid())
+        )
+    )
+  );
+
+create policy "owner_or_collaborator_can_delete_nikkels"
+  on nikkels for delete
+  using (
+    exists (
+      select 1 from reviews r
+      join projects p on p.id = r.project_id
+      where r.id = review_id
+        and (
+          p.owner_id = auth.uid()
+          or exists (select 1 from project_collaborators c where c.project_id = p.id and c.user_id = auth.uid())
+        )
+    )
+  );
 
 create index if not exists nikkels_review_id_idx on nikkels (review_id);
 
