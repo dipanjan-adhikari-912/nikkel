@@ -90,16 +90,18 @@ function CommentCard({ nikkel, sender }) {
         </div>
         <span style={{ color: '#94c3b3', fontSize: 14, flexShrink: 0 }}>{timeAgo(nikkel.created_at)}</span>
       </div>
-      {tag && (
-        <div style={{ background: '#131c19b3', border: '1px solid #72baa299', padding: 16, display: 'flex', alignItems: 'center' }}>
-          <span style={{ color: '#71b9a1', fontFamily: 'Inconsolata, monospace', fontSize: 16 }}>
-            &lt;{tag}&gt;
-          </span>
-        </div>
-      )}
-      {elementText && (
-        <div style={{ color: '#ffffff', fontFamily: 'Inconsolata, monospace', fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {elementText}
+      {(tag || elementText) && (
+        <div style={{ background: '#131c19b3', border: '1px solid #72baa299', padding: 16, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
+          {tag && (
+            <span style={{ color: '#71b9a1', fontFamily: 'Inconsolata, monospace', fontSize: 16, flexShrink: 0 }}>
+              &lt;{tag}&gt;
+            </span>
+          )}
+          {elementText && (
+            <span style={{ color: '#ffffff', fontFamily: 'Inconsolata, monospace', fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {elementText}
+            </span>
+          )}
         </div>
       )}
       {nikkel.comment && (
@@ -312,8 +314,8 @@ export default function ReviewPage({ params }) {
 
           {/* Content (1905 wide, centered in the 2400 design) */}
           <div style={{ paddingLeft: 247.5 }}>
-            {/* Header: wordmark + tagline left, reviewer right */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 33.6 }}>
+            {/* Header: wordmark + tagline left, reviewer right (width = browser 1446) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 33.6, width: 1446 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
                 <Wordmark width={105} />
                 <span style={{ color: '#dcf2ebff', fontSize: 18 }}>feedback, without the friction.</span>
@@ -333,7 +335,7 @@ export default function ReviewPage({ params }) {
               <div style={{ width: 413, flexShrink: 0, background: '#82b0a033', borderRadius: 24, padding: '28px 16.8px 31px', display: 'flex', flexDirection: 'column', gap: 14, backdropFilter: 'blur(21px)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ color: '#1b2723', fontSize: 22 }}>n</span>
+                    <span style={{ color: '#1b2723', fontSize: 22 }}>{(nikkels || []).length}</span>
                   </div>
                   <span style={{ color: '#ffffff', fontSize: 20, lineHeight: 1.3 }}>reviews on this website</span>
                 </div>
@@ -358,7 +360,7 @@ export default function ReviewPage({ params }) {
                     <span style={{ color: '#1b2723', fontSize: 16, fontWeight: 500 }}>
                       {opening ? 'Opening...' : 'Review Feedback'}
                     </span>
-                    <svg width="21" height="21" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <svg width="16" height="16" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>
                 ) : (
                   <a
@@ -368,7 +370,7 @@ export default function ReviewPage({ params }) {
                     <span style={{ color: '#1b2723', fontSize: 16, fontWeight: 500 }}>
                       {extensionState === false ? 'Install Nikkel' : 'Review Feedback'}
                     </span>
-                    <svg width="21" height="21" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <svg width="16" height="16" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </a>
                 )}
 
