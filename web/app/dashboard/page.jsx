@@ -171,6 +171,8 @@ export default function DashboardPage() {
     return () => clearTimeout(id)
   }, [toast])
 
+  const fs = useCallback((base) => base / scale, [scale])
+
   function copyShareLink(shareToken) {
     navigator.clipboard.writeText(`${window.location.origin}/review/${shareToken}`)
       .then(() => setToast('Share link copied'))
@@ -217,7 +219,7 @@ export default function DashboardPage() {
             <button onClick={refresh} style={{ width: 24, height: 24, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Refresh">
               <svg width="18" height="18" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
-            <span style={{ color: '#ddf3ec', fontSize: 16, whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#ddf3ec', fontSize: fs(16), whiteSpace: 'nowrap' }}>
               Last refreshed on: {lastRefreshed ? lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
             </span>
           </div>
@@ -229,19 +231,19 @@ export default function DashboardPage() {
               style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#82b0a033', borderRadius: 12, height: 48, padding: '0 16px', border: 'none', cursor: 'pointer', boxSizing: 'border-box' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <span style={{ color: '#ddf3ec', fontSize: 16 }}>Activity</span>
+              <span style={{ color: '#ddf3ec', fontSize: fs(16) }}>Activity</span>
               {totalUnread > 0 && (
-                <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{totalUnread}</span>
+                <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: fs(11), fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{totalUnread}</span>
               )}
               <svg width="12" height="12" viewBox="0 0 24 24" style={{ display: 'block', transform: activityOpen ? 'rotate(180deg)' : 'none' }}><path d="M6 9l6 6 6-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
             {activityOpen && (
               <div style={{ position: 'absolute', top: 56, right: 0, width: 300, background: '#101715', border: '1px solid #1b2723', borderRadius: 12, padding: 8, boxShadow: '0 12px 32px rgba(0,0,0,0.5)', zIndex: 50 }}>
-                {sorted.length === 0 && <div style={{ padding: '16px 12px', color: '#82b0a0', fontSize: 14 }}>No projects yet.</div>}
+                {sorted.length === 0 && <div style={{ padding: '16px 12px', color: '#82b0a0', fontSize: fs(14) }}>No projects yet.</div>}
                 {sorted.map(p => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8 }}>
-                    <span style={{ color: '#ddf3ec', fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || p.base_url}</span>
-                    <span style={{ color: '#82b0a0', fontSize: 12, flexShrink: 0 }}>{timeAgo(p.lastActivityAt)}</span>
+                    <span style={{ color: '#ddf3ec', fontSize: fs(14), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || p.base_url}</span>
+                    <span style={{ color: '#82b0a0', fontSize: fs(12), flexShrink: 0 }}>{timeAgo(p.lastActivityAt)}</span>
                   </div>
                 ))}
               </div>
@@ -277,7 +279,7 @@ export default function DashboardPage() {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
-                  style={{ padding: '16px 24px', borderRadius: 16, border: 'none', cursor: 'pointer', background: active ? '#ddf3ec' : '#1b2723cc', color: active ? '#101715' : '#ddf3ec', fontSize: 16, fontWeight: active ? 500 : 400 }}
+                  style={{ padding: '16px 24px', borderRadius: 16, border: 'none', cursor: 'pointer', background: active ? '#ddf3ec' : '#1b2723cc', color: active ? '#101715' : '#ddf3ec', fontSize: fs(16), fontWeight: active ? 500 : 400 }}
                 >
                   {t.label}
                 </button>
@@ -288,7 +290,7 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <button
               onClick={() => setSortAsc(a => !a)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 24px', background: '#82b0a033', border: 'none', borderRadius: 16, cursor: 'pointer', color: '#ddf3ec', fontSize: 15 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 24px', background: '#82b0a033', border: 'none', borderRadius: 16, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(15) }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M3 6h11M3 12h7M3 18h4M17 4v16M17 20l4-4M17 4l4 4" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform={sortAsc ? 'scale(1,-1) translate(0,-24)' : undefined} /></svg>
               <span>Sort by date</span>
@@ -300,7 +302,7 @@ export default function DashboardPage() {
         {/* Project grid */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#82b0a0' }}>
-            <p style={{ fontSize: 15 }}>Loading...</p>
+            <p style={{ fontSize: fs(15) }}>Loading...</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 22 }}>
@@ -308,6 +310,7 @@ export default function DashboardPage() {
               <ProjectCard
                 key={p.id}
                 project={p}
+                scale={scale}
                 unreadCount={unread[p.id] || 0}
                 menuOpen={menuOpen === p.id}
                 onMenuToggle={() => setMenuOpen(menuOpen === p.id ? null : p.id)}
@@ -317,7 +320,7 @@ export default function DashboardPage() {
             ))}
             {sorted.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: '#82b0a0', gridColumn: '1 / -1' }}>
-                <p style={{ fontSize: 15 }}>No projects here yet. Start a review from the Nikkel extension.</p>
+                <p style={{ fontSize: fs(15) }}>No projects here yet. Start a review from the Nikkel extension.</p>
               </div>
             )}
           </div>
@@ -379,7 +382,8 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, onDelete }) {
+function ProjectCard({ project, scale, unreadCount, menuOpen, onMenuToggle, onShare, onDelete }) {
+  const fs = useCallback((base) => base / scale, [scale])
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
   const pages = project.pageBreakdown || []
@@ -394,7 +398,7 @@ function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, on
           <img src={project.screenshot_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#ffffff', fontSize: 16, fontWeight: 500 }}>[ screenshot ]</span>
+            <span style={{ color: '#ffffff', fontSize: fs(16), fontWeight: 500 }}>[ screenshot ]</span>
           </div>
         )}
 
@@ -406,9 +410,9 @@ function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, on
             onError={(e) => { e.target.style.display = 'none' }}
             style={{ width: 37, height: 37, borderRadius: '50%', objectFit: 'cover', background: '#d9d9d9' }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <span style={{ color: '#ddf3ec', fontSize: 14, fontWeight: 500, lineHeight: '16px' }}>{name}</span>
-            <span style={{ color: '#ddf3ec', fontSize: 11, fontWeight: 500, lineHeight: '16px' }}>{timeAgo(project.lastActivityAt)}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+            <span style={{ color: '#ddf3ec', fontSize: fs(14), fontWeight: 500, lineHeight: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>{name}</span>
+            <span style={{ color: '#ddf3ec', fontSize: fs(11), fontWeight: 500, lineHeight: '16px' }}>{timeAgo(project.lastActivityAt)}</span>
           </div>
         </div>
 
@@ -429,11 +433,11 @@ function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, on
           </div>
           {menuOpen && (
             <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 38, right: 0, width: 150, background: '#101715', border: '1px solid #1b2723', borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-              <div onClick={onShare} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div onClick={onShare} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <svg width="15" height="15" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M5 12a2 2 0 1 0 0-.01M19 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01" fill="none" stroke="#82b0a0" strokeWidth="2" /><path d="M12 11a1 1 0 0 0 .5-.87l2.5-1.5M9.5 15.4a3 3 0 1 0 3.5-5.1l2.5-1.5" fill="none" stroke="#82b0a0" strokeWidth="2" strokeLinecap="round" /></svg>
                 Share link
               </div>
-              <div onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <svg width="15" height="15" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 Delete project
               </div>
@@ -442,7 +446,7 @@ function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, on
         </div>
 
         {unreadCount > 0 && (
-          <span style={{ position: 'absolute', top: 8, right: 48, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>
+          <span style={{ position: 'absolute', top: 8, right: 48, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: fs(11), fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>
         )}
       </div>
 
@@ -452,15 +456,15 @@ function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, on
           {/* page count */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M14 3v5h5" /><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" /><path d="M9 14h6M9 17h6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
-            <span style={{ color: '#ffffff', fontSize: 15 }}>{pageCount} {pageCount === 1 ? 'Page' : 'Pages'}</span>
+            <span style={{ color: '#ffffff', fontSize: fs(15) }}>{pageCount} {pageCount === 1 ? 'Page' : 'Pages'}</span>
           </div>
           <div style={{ width: 1, height: 18, background: '#82b0a033' }} />
           {/* nikkel count */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 24, height: 24, borderRadius: 12, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#1b2723', fontSize: 14, fontWeight: 500 }}>{project.nikkelCount ?? 0}</span>
+              <span style={{ color: '#1b2723', fontSize: fs(14), fontWeight: 500 }}>{project.nikkelCount ?? 0}</span>
             </div>
-            <span style={{ color: '#ffffff', fontSize: 15 }}>nikkels</span>
+            <span style={{ color: '#ffffff', fontSize: fs(15) }}>nikkels</span>
           </div>
         </div>
 
@@ -470,7 +474,7 @@ function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, on
           rel="noopener noreferrer"
           style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
         >
-          <span style={{ color: '#ffffff', fontSize: 14, fontWeight: 500 }}>View project</span>
+          <span style={{ color: '#ffffff', fontSize: fs(14), fontWeight: 500, whiteSpace: 'nowrap' }}>View project</span>
           <svg width="14" height="14" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="#71b9a1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </a>
       </div>
