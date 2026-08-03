@@ -214,42 +214,43 @@ export default function DashboardPage() {
   const totalUnread = Object.values(unread).reduce((s, n) => s + (n || 0), 0)
 
   return (
-    <div style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '24px' }}>
-      <div style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative', flexShrink: 0 }}>
-        <div style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+    <div data-nk="page-bg" style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '24px' }}>
+      <div data-nk="scale-wrapper" style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative', flexShrink: 0 }}>
+        <div data-nk="design-container" style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
       {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '40px 110px 36px' }}>
+      <div data-nk="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '40px 110px 36px' }}>
         <Wordmark width={96} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div data-nk="top-bar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Refresh chip */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#82b0a033', borderRadius: 12, padding: '12px 16px', height: 48, boxSizing: 'border-box' }}>
-            <button onClick={refresh} style={{ width: 24, height: 24, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Refresh">
+          <div data-nk="refresh-chip" style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#82b0a033', borderRadius: 12, padding: '12px 16px', height: 48, boxSizing: 'border-box' }}>
+            <button data-nk="refresh-button" onClick={refresh} style={{ width: 24, height: 24, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Refresh">
               <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
-            <span style={{ color: '#ddf3ec', fontSize: fs(16), whiteSpace: 'nowrap' }}>
+            <span data-nk="last-refreshed" style={{ color: '#ddf3ec', fontSize: fs(16), whiteSpace: 'nowrap' }}>
               Last refreshed on: {lastRefreshed ? timeAgo(lastRefreshed.toISOString(), now) : 'Just now'}
             </span>
           </div>
 
           {/* Activity dropdown */}
-          <div style={{ position: 'relative' }}>
+          <div data-nk="activity-dropdown" style={{ position: 'relative' }}>
             <button
+              data-nk="activity-button"
               onClick={() => setActivityOpen(o => !o)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#82b0a033', borderRadius: 12, height: 48, padding: '0 16px', border: 'none', cursor: 'pointer', boxSizing: 'border-box' }}
             >
               <svg width={is(20, 20)} height={is(20, 20)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               <span style={{ color: '#ddf3ec', fontSize: fs(16) }}>Activity</span>
               {totalUnread > 0 && (
-                <span style={{ minWidth: is(18, 16), height: is(18, 16), padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: fs(11), fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{totalUnread}</span>
+                <span data-nk="activity-unread-badge" style={{ minWidth: is(18, 16), height: is(18, 16), padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: fs(11), fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{totalUnread}</span>
               )}
               <svg width={is(12, 12)} height={is(12, 12)} viewBox="0 0 24 24" style={{ display: 'block', transform: activityOpen ? 'rotate(180deg)' : 'none' }}><path d="M6 9l6 6 6-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
             {activityOpen && (
-              <div style={{ position: 'absolute', top: 56, right: 0, width: 300, background: '#101715', border: '1px solid #1b2723', borderRadius: 12, padding: 8, boxShadow: '0 12px 32px rgba(0,0,0,0.5)', zIndex: 50 }}>
+              <div data-nk="activity-panel" style={{ position: 'absolute', top: 56, right: 0, width: 300, background: '#101715', border: '1px solid #1b2723', borderRadius: 12, padding: 8, boxShadow: '0 12px 32px rgba(0,0,0,0.5)', zIndex: 50 }}>
                 {sorted.length === 0 && <div style={{ padding: '16px 12px', color: '#82b0a0', fontSize: fs(14) }}>No projects yet.</div>}
                 {sorted.map(p => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8 }}>
+                  <div key={p.id} data-nk="activity-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8 }}>
                     <span style={{ color: '#ddf3ec', fontSize: fs(14), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || p.base_url}</span>
                     <span style={{ color: '#82b0a0', fontSize: fs(12), flexShrink: 0 }}>{timeAgo(p.lastActivityAt)}</span>
                   </div>
@@ -260,6 +261,7 @@ export default function DashboardPage() {
 
           {/* Settings */}
           <button
+            data-nk="settings-button"
             onClick={() => setToast('Settings coming soon')}
             style={{ width: 48, height: 48, background: '#82b0a033', borderRadius: 12, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             aria-label="Settings"
@@ -269,6 +271,7 @@ export default function DashboardPage() {
 
           {/* Avatar */}
           <img
+            data-nk="user-avatar"
             src={user?.avatar_url || DEFAULT_AVATAR}
             alt=""
             style={{ width: is(48, 24), height: is(48, 24), borderRadius: 12, objectFit: 'cover', background: '#d9d9d9' }}
@@ -277,15 +280,16 @@ export default function DashboardPage() {
       </div>
 
       {/* Main panel */}
-      <div style={{ margin: '0 110px 48px', background: '#82b0a033', borderRadius: 24, padding: '40px 36px 36px', backdropFilter: 'blur(12px)' }}>
+      <div data-nk="main-panel" style={{ margin: '0 110px 48px', background: '#82b0a033', borderRadius: 24, padding: '40px 36px 36px', backdropFilter: 'blur(12px)' }}>
         {/* Tabs row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div data-nk="tabs-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
+          <div data-nk="tabs" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {TABS.map(t => {
               const active = tab === t.key
               return (
                 <button
                   key={t.key}
+                  data-nk={`tab-${t.key}`}
                   onClick={() => setTab(t.key)}
                   style={{ padding: '16px 24px', borderRadius: 16, border: 'none', cursor: 'pointer', background: active ? '#ddf3ec' : '#1b2723cc', color: active ? '#101715' : '#ddf3ec', fontSize: fs(16), fontWeight: active ? 500 : 400 }}
                 >
@@ -297,6 +301,7 @@ export default function DashboardPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <button
+              data-nk="sort-button"
               onClick={() => setSortAsc(a => !a)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 24px', background: '#82b0a033', border: 'none', borderRadius: 16, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(15) }}
             >
@@ -309,11 +314,11 @@ export default function DashboardPage() {
         {/* New project form */}
         {/* Project grid */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#82b0a0' }}>
+          <div data-nk="loading" style={{ textAlign: 'center', padding: 60, color: '#82b0a0' }}>
             <p style={{ fontSize: fs(15) }}>Loading...</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 22 }}>
+          <div data-nk="project-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 22 }}>
             {sorted.map(p => (
               <ProjectCard
                 key={p.id}
@@ -326,7 +331,7 @@ export default function DashboardPage() {
               />
             ))}
             {sorted.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 40, color: '#82b0a0', gridColumn: '1 / -1' }}>
+              <div data-nk="empty-state" style={{ textAlign: 'center', padding: 40, color: '#82b0a0', gridColumn: '1 / -1' }}>
                 <p style={{ fontSize: fs(15) }}>No projects here yet. Start a review from the Nikkel extension.</p>
               </div>
             )}
@@ -338,7 +343,7 @@ export default function DashboardPage() {
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, padding: '10px 20px', background: '#101715', border: '1px solid #1b2723', borderRadius: 12, color: '#ddf3ec', fontSize: 14, zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+        <div data-nk="toast" style={{ position: 'fixed', bottom: 24, right: 24, padding: '10px 20px', background: '#101715', border: '1px solid #1b2723', borderRadius: 12, color: '#ddf3ec', fontSize: 14, zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
           {toast}
         </div>
       )}
@@ -346,6 +351,7 @@ export default function DashboardPage() {
       {/* Delete confirmation dialog */}
       {confirmDelete && (
         <div
+          data-nk="delete-dialog"
           onClick={() => setConfirmDelete(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
         >
@@ -399,39 +405,40 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
   const name = project.title || domain || 'Untitled Project'
 
   return (
-    <div style={{ background: '#101715', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div data-nk="project-card" style={{ background: '#101715', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* Screenshot area */}
-      <div style={{ position: 'relative', aspectRatio: '466 / 312', margin: 20, borderRadius: 16, background: '#1b2723', overflow: 'hidden' }}>
+      <div data-nk="screenshot-area" style={{ position: 'relative', aspectRatio: '466 / 312', margin: 20, borderRadius: 16, background: '#1b2723', overflow: 'hidden' }}>
         {project.screenshot_url ? (
           <img src={project.screenshot_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div data-nk="screenshot-placeholder" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ color: '#ffffff', fontSize: fs(16), fontWeight: 500 }}>[ screenshot ]</span>
           </div>
         )}
 
         {/* Overlay pill (project + time) */}
-        <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: '#1b2723cc', borderRadius: 8, backdropFilter: 'blur(3.5px)' }}>
+        <div data-nk="overlay-pill" style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: '#1b2723cc', borderRadius: 8, backdropFilter: 'blur(3.5px)' }}>
           <img
             src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
             alt=""
             onError={(e) => { e.target.style.display = 'none' }}
             style={{ width: is(37, 24), height: is(37, 24), borderRadius: '50%', objectFit: 'cover', background: '#d9d9d9' }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+          <div data-nk="overlay-pill-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
             <span style={{ color: '#ddf3ec', fontSize: fs(14), fontWeight: 500, lineHeight: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>{name}</span>
             <span style={{ color: '#ddf3ec', fontSize: fs(11), fontWeight: 500, lineHeight: '16px' }}>{timeAgo(project.lastActivityAt)}</span>
           </div>
         </div>
 
         {/* Top-right: collaborator badge + ellipsis menu */}
-        <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div data-nk="card-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           {project.collaboratorCount > 0 && (
-            <div style={{ width: is(32, 24), height: is(32, 24), borderRadius: 8, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div data-nk="collaborator-badge" style={{ width: is(32, 24), height: is(32, 24), borderRadius: 8, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width={is(16, 16)} height={is(16, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
           )}
           <div
+            data-nk="card-menu-button"
             onClick={(e) => { e.stopPropagation(); onMenuToggle() }}
             style={{ width: is(32, 24), height: is(32, 24), borderRadius: 6, background: '#1b2723cc', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
@@ -440,12 +447,12 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
             </svg>
           </div>
           {menuOpen && (
-            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 38, right: 0, width: 150, background: '#101715', border: '1px solid #1b2723', borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-              <div onClick={onShare} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <div data-nk="card-menu" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 38, right: 0, width: 150, background: '#101715', border: '1px solid #1b2723', borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              <div data-nk="card-menu-share" onClick={onShare} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <svg width={is(15, 16)} height={is(15, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M5 12a2 2 0 1 0 0-.01M19 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01" fill="none" stroke="#82b0a0" strokeWidth="2" /><path d="M12 11a1 1 0 0 0 .5-.87l2.5-1.5M9.5 15.4a3 3 0 1 0 3.5-5.1l2.5-1.5" fill="none" stroke="#82b0a0" strokeWidth="2" strokeLinecap="round" /></svg>
                 Share link
               </div>
-              <div onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div data-nk="card-menu-delete" onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <svg width={is(15, 16)} height={is(15, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 Delete project
               </div>
@@ -455,16 +462,16 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
       </div>
 
       {/* Footer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 20px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div data-nk="card-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 20px 20px' }}>
+        <div data-nk="card-stats" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* page count */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div data-nk="page-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M14 3v5h5" /><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" /><path d="M9 14h6M9 17h6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
             <span style={{ color: '#ffffff', fontSize: fs(15) }}>{pageCount} {pageCount === 1 ? 'Page' : 'Pages'}</span>
           </div>
           <div style={{ width: 1, height: 18, background: '#82b0a033' }} />
           {/* nikkel count */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div data-nk="nikkel-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: is(24, 24), height: is(24, 24), borderRadius: 12, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#1b2723', fontSize: fs(14), fontWeight: 500 }}>{project.nikkelCount ?? 0}</span>
             </div>
@@ -473,6 +480,7 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
         </div>
 
         <a
+          data-nk="view-project-link"
           href={`/review/${project.share_token}`}
           target="_blank"
           rel="noopener noreferrer"
