@@ -303,7 +303,7 @@ export default function DashboardPage() {
             <p style={{ fontSize: 15 }}>Loading...</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 22 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 22 }}>
             {sorted.map(p => (
               <ProjectCard
                 key={p.id}
