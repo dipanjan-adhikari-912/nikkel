@@ -239,9 +239,6 @@ export default function DashboardPage() {
                   key={p.id}
                   project={p}
                   unreadCount={unread[p.id] || 0}
-                  deleting={deletingId === p.id}
-                  onCopyShare={() => copyShareLink(p.share_token)}
-                  onDelete={() => deleteProject(p.id)}
                 />
               ))}
               {projects.length === 0 && (
@@ -316,96 +313,88 @@ function Sidebar({ user, nav, onNav, onLogout }) {
   )
 }
 
-function relativePath(pageUrl, baseUrl) {
-  if (!pageUrl || pageUrl === 'unknown') return '/'
-  try {
-    const full = new URL(pageUrl)
-    const base = baseUrl ? new URL(baseUrl) : null
-    if (base && full.origin + full.pathname === base.origin + base.pathname) return '/'
-    if (base && full.origin === base.origin) return full.pathname + full.search || '/'
-    return pageUrl
-  } catch { return pageUrl }
+function timeAgo(iso) {
+  if (!iso) return ''
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (s < 60) return 'Just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `${d}d ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function ProjectCard({ project, onCopyShare, onDelete, deleting, unreadCount }) {
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
-  const isOwner = project.role !== 'collaborator'
   const pages = project.pageBreakdown || []
   const pageCount = pages.length
+  const name = project.title || domain || 'Untitled Project'
 
   return (
-    <div style={{ background: '#1e293b', borderRadius: 8, border: '1px solid #334155', overflow: 'hidden' }}>
-      {/* Header with favicon */}
-      <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ position: 'relative', flexShrink: 0, width: 28, height: 28 }}>
+    <div style={{ background: '#101014', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* Screenshot area */}
+      <div style={{ position: 'relative', aspectRatio: '466 / 312', margin: 22, borderRadius: 16, background: '#1b2723', overflow: 'hidden' }}>
+        {/* screenshot placeholder */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ color: '#ffffff', fontSize: 16, fontWeight: 500 }}>[ screenshot ]</span>
+        </div>
+
+        {/* Overlay pill (project + time) */}
+        <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: '#1b2723cc', borderRadius: 8, backdropFilter: 'blur(3.5px)' }}>
           <img
             src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
             alt=""
             onError={(e) => { e.target.style.display = 'none' }}
-            style={{ width: 28, height: 28, borderRadius: 4 }}
+            style={{ width: 37, height: 37, borderRadius: '50%', objectFit: 'cover', background: '#d9d9d9' }}
           />
-          {unreadCount > 0 && (
-            <span style={{ position: 'absolute', top: -6, right: -6, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{unreadCount}</span>
-          )}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontWeight: 700, fontSize: 15, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{domain || 'No URL'}</span>
-            {!isOwner && (
-              <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: '#fef3c7', color: '#92400e', textTransform: 'uppercase', flexShrink: 0 }}>Collab</span>
-            )}
-            {project.collaboratorCount > 0 && (
-              <span style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4338ca', flexShrink: 0 }}>👥 {project.collaboratorCount + 1}</span>
-            )}
-          </div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>
-            {pageCount} {pageCount === 1 ? 'page' : 'pages'} · {project.nikkelCount ?? 0} nikkels
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <span style={{ color: '#ddf3ec', fontSize: 14, fontWeight: 500, lineHeight: '16px' }}>{name}</span>
+            <span style={{ color: '#82b0a0', fontSize: 11, fontWeight: 500, lineHeight: '16px' }}>{timeAgo(project.lastActivityAt)}</span>
           </div>
         </div>
+
+        {/* ellipsis menu */}
+        <div style={{ position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 6, background: '#1b2723cc', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <svg width="4" height="16" viewBox="0 0 4 16" style={{ display: 'block' }}>
+            {[3.2, 8, 12.8].map(y => <circle key={y} cx="2" cy={y} r="1.6" fill="#e2e8f0" />)}
+          </svg>
+        </div>
+
+        {unreadCount > 0 && (
+          <span style={{ position: 'absolute', top: 8, right: 48, minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>
+        )}
       </div>
 
-      {/* Page list */}
-      {pages.length > 0 && (
-        <div style={{ margin: '4px 10px 0', borderTop: '1px solid #334155', paddingTop: 6 }}>
-          {pages.map((page, i) => (
-            <a
-              key={i}
-              href={`/review/${project.share_token}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 4,
-                fontSize: 13, color: '#cbd5e1', textDecoration: 'none', cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#334155' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-            >
-              <span style={{ color: '#475569', flexShrink: 0, fontSize: 11 }}>📄</span>
-              <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace', fontSize: 12 }}>
-                {relativePath(page.pageUrl, project.base_url)}
-              </span>
-              <span style={{ padding: '1px 7px', borderRadius: 8, background: '#334155', color: '#94a3b8', fontSize: 11, fontWeight: 500, flexShrink: 0 }}>
-                {page.nikkelCount}
-              </span>
-            </a>
-          ))}
-        </div>
-      )}
-
       {/* Footer */}
-      <div style={{ padding: '8px 14px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: '#475569' }}>
-          {project.lastActivityAt ? new Date(project.lastActivityAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-        </span>
-          {isOwner && (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={onCopyShare} style={{ padding: '4px 10px', border: '1px solid #334155', borderRadius: 4, background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 11 }}>Copy link</button>
-              <button onClick={onDelete} disabled={deleting} style={{ padding: '4px 10px', border: '1px solid #7f1d1d', borderRadius: 4, background: deleting ? '#7f1d1d' : 'transparent', color: deleting ? '#fef2f2' : '#fca5a5', cursor: deleting ? 'wait' : 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 22px 22px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* page count */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M14 3v5h5" /><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" /><path d="M9 14h6M9 17h6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+            <span style={{ color: '#ffffff', fontSize: 15 }}>{pageCount} {pageCount === 1 ? 'Page' : 'Pages'}</span>
+          </div>
+          <div style={{ width: 1, height: 18, background: '#82b0a033' }} />
+          {/* nikkel count */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 12, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#1b2723', fontSize: 14, fontWeight: 500 }}>{project.nikkelCount ?? 0}</span>
             </div>
-          )}
+            <span style={{ color: '#ffffff', fontSize: 15 }}>nikkels</span>
+          </div>
+        </div>
+
+        <a
+          href={`/review/${project.share_token}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+        >
+          <span style={{ color: '#ffffff', fontSize: 14, fontWeight: 500 }}>View project</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="#71b9a1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </a>
       </div>
     </div>
   )
