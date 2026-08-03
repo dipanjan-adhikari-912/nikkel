@@ -36,6 +36,8 @@ export default function DashboardPage() {
   const [nav, setNav] = useState('home')
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
   const [toast, setToast] = useState(null)
   const [unread, setUnread] = useState({})
   const [lastRefreshed, setLastRefreshed] = useState(null)
@@ -145,6 +147,8 @@ export default function DashboardPage() {
 
   function copyShareLink(shareToken) {
     navigator.clipboard.writeText(`${window.location.origin}/review/${shareToken}`)
+      .then(() => setToast('Share link copied'))
+      .catch(() => setToast('Failed to copy link'))
   }
 
   if (!token) {
@@ -239,6 +243,10 @@ export default function DashboardPage() {
                   key={p.id}
                   project={p}
                   unreadCount={unread[p.id] || 0}
+                  menuOpen={menuOpen === p.id}
+                  onMenuToggle={() => setMenuOpen(menuOpen === p.id ? null : p.id)}
+                  onShare={() => copyShareLink(p.share_token)}
+                  onDelete={() => { setMenuOpen(null); setConfirmDelete(p.id) }}
                 />
               ))}
               {projects.length === 0 && (
@@ -250,6 +258,36 @@ export default function DashboardPage() {
           )
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      {confirmDelete && (
+        <div
+          onClick={() => setConfirmDelete(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: 420, maxWidth: '100%', background: '#101014', border: '1px solid #1b2723', borderRadius: 16, padding: 28 }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 600, color: '#ffffff' }}>Delete project?</h3>
+            <p style={{ margin: 0, fontSize: 14, color: '#82b0a0', lineHeight: 1.5 }}>
+              This will permanently delete the project and all its feedback. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                style={{ padding: '9px 16px', background: '#1b2723', color: '#e2e8f0', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { const id = confirmDelete; setConfirmDelete(null); deleteProject(id) }}
+                disabled={deletingId === confirmDelete}
+                style={{ padding: '9px 16px', background: deletingId === confirmDelete ? '#7f1d1d' : '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: deletingId === confirmDelete ? 'wait' : 'pointer', fontSize: 14, fontWeight: 500 }}
+              >
+                {deletingId === confirmDelete ? 'Deleting...' : 'Delete project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -326,7 +364,7 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function ProjectCard({ project, onCopyShare, onDelete, deleting, unreadCount }) {
+function ProjectCard({ project, unreadCount, menuOpen, onMenuToggle, onShare, onDelete }) {
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
   const pages = project.pageBreakdown || []
@@ -360,10 +398,27 @@ function ProjectCard({ project, onCopyShare, onDelete, deleting, unreadCount }) 
         </div>
 
         {/* ellipsis menu */}
-        <div style={{ position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 6, background: '#1b2723cc', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <svg width="4" height="16" viewBox="0 0 4 16" style={{ display: 'block' }}>
-            {[3.2, 8, 12.8].map(y => <circle key={y} cx="2" cy={y} r="1.6" fill="#e2e8f0" />)}
-          </svg>
+        <div style={{ position: 'absolute', top: 8, right: 8 }}>
+          <div
+            onClick={(e) => { e.stopPropagation(); onMenuToggle() }}
+            style={{ width: 32, height: 32, borderRadius: 6, background: '#1b2723cc', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <svg width="4" height="16" viewBox="0 0 4 16" style={{ display: 'block' }}>
+              {[3.2, 8, 12.8].map(y => <circle key={y} cx="2" cy={y} r="1.6" fill="#e2e8f0" />)}
+            </svg>
+          </div>
+          {menuOpen && (
+            <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 38, right: 0, width: 150, background: '#101014', border: '1px solid #1b2723', borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              <div onClick={onShare} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="15" height="15" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M5 12a2 2 0 1 0 0-.01M19 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01" fill="none" stroke="#82b0a0" strokeWidth="2" /><path d="M12 11a1 1 0 0 0 .5-.87l2.5-1.5M9.5 15.4a3 3 0 1 0 3.5-5.1l2.5-1.5" fill="none" stroke="#82b0a0" strokeWidth="2" strokeLinecap="round" /></svg>
+                Share link
+              </div>
+              <div onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <svg width="15" height="15" viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                Delete project
+              </div>
+            </div>
+          )}
         </div>
 
         {unreadCount > 0 && (
