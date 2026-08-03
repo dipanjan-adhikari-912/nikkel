@@ -144,7 +144,7 @@ export default function DashboardPage() {
   useEffect(() => {
     function updateScale() {
       const fit = (window.innerWidth - 48) / DESIGN_W
-      setScale(Math.min(1, Math.max(0.4, fit)))
+      setScale(Math.min(1, Math.max(0.6, fit)))
     }
     updateScale()
     window.addEventListener('resize', updateScale)
