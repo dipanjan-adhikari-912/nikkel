@@ -155,8 +155,8 @@ export default function DashboardPage() {
     setDeletingId(id)
     try {
       await api(token, `/projects/${id}`, { method: 'DELETE' })
-      const updated = await api(token, '/projects')
-      setProjects(updated)
+      setProjects(prev => prev.filter(p => p.id !== id))
+      setUnread(prev => { const next = { ...prev }; delete next[id]; return next })
       setToast('Project deleted')
     } catch {
       setToast('Failed to delete project')
