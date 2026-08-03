@@ -205,10 +205,10 @@ export default function DashboardPage() {
   const totalUnread = Object.values(unread).reduce((s, n) => s + (n || 0), 0)
 
   return (
-    <div style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: '100% 100%', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif' }}>
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '40px clamp(24px, 6vw, 110px) 36px' }}>
-        <Wordmark width={150} />
+        <Wordmark width={96} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Refresh chip */}

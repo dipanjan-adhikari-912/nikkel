@@ -963,9 +963,19 @@ function stopPolling() {
   }
 }
 
+function isViewerHost(dashboardUrl) {
+  try {
+    return location.host === new URL(dashboardUrl).host;
+  } catch { return false; }
+}
+
 function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly, dashboardUrl) {
   if (barHost) {
     console.log('[Nikkel] injectBar: barHost already exists, skipping');
+    return;
+  }
+  if (isViewerHost(dashboardUrl)) {
+    console.log('[Nikkel] injectBar: on viewer host, skipping');
     return;
   }
   console.log('[Nikkel] injectBar: injecting bar', { projectName, sessionId, shareUrl, initialMode, reviewId, isReadOnly, dashboardUrl });
