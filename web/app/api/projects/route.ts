@@ -68,17 +68,36 @@ export async function GET(request: NextRequest) {
     return { ...p, nikkelCount, lastActivityAt, pageBreakdown, screenshot_url }
   })
 
-  // Batch collaborator count in one query
-  const { data: collabCounts } = await db
+  // Batch collaborator details in one query
+  const { data: collabDetailRows } = await db
     .from('project_collaborators')
-    .select('project_id')
+    .select('project_id, user_id')
     .in('project_id', projectIds)
   const collabMap: Record<string, number> = {}
-  if (collabCounts) {
-    for (const c of collabCounts) { collabMap[c.project_id] = (collabMap[c.project_id] || 0) + 1 }
+  const collabUsers: Record<string, string[]> = {}
+  const userIds = new Set<string>()
+  for (const c of collabDetailRows || []) {
+    collabMap[c.project_id] = (collabMap[c.project_id] || 0) + 1
+    if (!collabUsers[c.project_id]) collabUsers[c.project_id] = []
+    collabUsers[c.project_id].push(c.user_id)
+    userIds.add(c.user_id)
   }
 
-  return NextResponse.json(enriched.map(p => ({ ...p, collaboratorCount: collabMap[p.id] || 0 })))
+  let profilesById: Record<string, any> = {}
+  if (userIds.size > 0) {
+    const { data: profiles } = await db
+      .from('profiles')
+      .select('id, name, email, avatar_url')
+      .in('id', [...userIds])
+    profilesById = Object.fromEntries((profiles || []).map((p: any) => [p.id, p]))
+  }
+
+  const collaboratorsByProject: Record<string, any[]> = {}
+  for (const pid of Object.keys(collabUsers)) {
+    collaboratorsByProject[pid] = (collabUsers[pid] || []).map(uid => profilesById[uid]).filter(Boolean)
+  }
+
+  return NextResponse.json(enriched.map(p => ({ ...p, collaboratorCount: collabMap[p.id] || 0, collaborators: collaboratorsByProject[p.id] || [] })))
 }
 
 export async function POST(request: NextRequest) {

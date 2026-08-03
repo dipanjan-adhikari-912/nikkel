@@ -17,9 +17,9 @@ const WORDMARK = [
   { d: 'M71.2605 13.466C71.7852 12.3108 72.0475 11.068 72.0475 9.73772C72.0475 8.44244 71.7852 7.21718 71.2605 6.06193C70.7708 4.87167 70.0887 3.85645 69.2142 3.01627C68.3397 2.14109 67.3078 1.45844 66.1185 0.968334C64.9642 0.443221 63.7224 0.180664 62.3932 0.180664C61.064 0.180664 59.8047 0.443221 58.6154 0.968334C57.4611 1.45844 56.4467 2.14109 55.5722 3.01627C54.7327 3.85645 54.0506 4.87167 53.5259 6.06193C53.0362 7.21718 52.7914 8.44244 52.7914 9.73772C52.7914 11.068 53.0362 12.3108 53.5259 13.466C54.0506 14.6213 54.7327 15.6365 55.5722 16.5117C56.4467 17.3519 57.4611 18.0345 58.6154 18.5596C59.8047 19.0497 61.064 19.2948 62.3932 19.2948C63.7224 19.2948 64.9642 19.0497 66.1185 18.5596C67.3078 18.0345 68.3397 17.3519 69.2142 16.5117C70.0887 15.6365 70.7708 14.6213 71.2605 13.466Z', fill: '#71b9a1' },
 ]
 
-function Wordmark({ width = 105 }) {
+function Wordmark({ width = 105, height }) {
   return (
-    <svg viewBox="0 0 244 75" width={width} height={width * (75 / 244)} fill="none" style={{ display: 'block' }}>
+    <svg viewBox="0 0 244 75" width={width} height={height ?? width * (75 / 244)} fill="none" style={{ display: 'block' }}>
       {WORDMARK.map((p, i) => (
         <path key={i} d={p.d} fill={p.fill} />
       ))}
@@ -158,6 +158,18 @@ export default function DashboardPage() {
     return () => clearInterval(id)
   }, [])
 
+  // Close the card menu when clicking outside it
+  useEffect(() => {
+    if (!menuOpen) return
+    function onClick(e) {
+      if (!e.target?.closest?.('[data-nk="card-menu"], [data-nk="card-menu-button"]')) {
+        setMenuOpen(null)
+      }
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [menuOpen])
+
   const deleteProject = useCallback(async (id) => {
     setDeletingId(id)
     try {
@@ -201,9 +213,11 @@ export default function DashboardPage() {
     return p.role === 'collaborator'
   })
   const sorted = [...filtered].sort((a, b) => {
-    const ta = new Date(a.lastActivityAt || a.created_at).getTime()
-    const tb = new Date(b.lastActivityAt || b.created_at).getTime()
-    return sortAsc ? ta - tb : tb - ta
+    const ta = new Date(a.lastActivityAt || a.created_at || 0).getTime()
+    const tb = new Date(b.lastActivityAt || b.created_at || 0).getTime()
+    const na = Number.isNaN(ta) ? 0 : ta
+    const nb = Number.isNaN(tb) ? 0 : tb
+    return sortAsc ? na - nb : nb - na
   })
 
   const TABS = [
@@ -219,11 +233,11 @@ export default function DashboardPage() {
         <div data-nk="design-container" style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
       {/* Top bar */}
       <div data-nk="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '40px 110px 36px' }}>
-        <Wordmark width={96} />
+        <Wordmark width={200} height={84} />
 
         <div data-nk="top-bar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Refresh chip */}
-          <div data-nk="refresh-chip" style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#82b0a033', borderRadius: 12, padding: '12px 16px', height: 48, boxSizing: 'border-box' }}>
+          <div data-nk="refresh-chip" style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#82b0a033', borderRadius: 12, padding: '12px 16px', height: 76, boxSizing: 'border-box' }}>
             <button data-nk="refresh-button" onClick={refresh} style={{ width: 24, height: 24, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Refresh">
               <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
@@ -237,7 +251,7 @@ export default function DashboardPage() {
             <button
               data-nk="activity-button"
               onClick={() => setActivityOpen(o => !o)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#82b0a033', borderRadius: 12, height: 48, padding: '0 16px', border: 'none', cursor: 'pointer', boxSizing: 'border-box' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#82b0a033', borderRadius: 12, height: 76, padding: '0 16px', border: 'none', cursor: 'pointer', boxSizing: 'border-box' }}
             >
               <svg width={is(20, 20)} height={is(20, 20)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
               <span style={{ color: '#ddf3ec', fontSize: fs(16) }}>Activity</span>
@@ -263,7 +277,7 @@ export default function DashboardPage() {
           <button
             data-nk="settings-button"
             onClick={() => setToast('Settings coming soon')}
-            style={{ width: 48, height: 48, background: '#82b0a033', borderRadius: 12, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 76, height: 76, background: '#82b0a033', borderRadius: 12, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             aria-label="Settings"
           >
             <svg width={is(20, 20)} height={is(20, 20)} viewBox="0 0 24 24" style={{ display: 'block' }}><circle cx="12" cy="12" r="3" fill="none" stroke="#ddf3ec" strokeWidth="2" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -272,9 +286,9 @@ export default function DashboardPage() {
           {/* Avatar */}
           <img
             data-nk="user-avatar"
-            src={user?.avatar_url || DEFAULT_AVATAR}
+            src={user?.profile?.avatar_url || user?.avatar_url || DEFAULT_AVATAR}
             alt=""
-            style={{ width: is(48, 24), height: is(48, 24), borderRadius: 12, objectFit: 'cover', background: '#d9d9d9' }}
+            style={{ width: 76, height: 76, borderRadius: 12, objectFit: 'cover', background: '#d9d9d9' }}
           />
         </div>
       </div>
@@ -398,6 +412,7 @@ function timeAgo(iso, now = Date.now()) {
 function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete }) {
   const fs = useCallback((base) => base / scale, [scale])
   const is = useCallback((base, min) => Math.max(min, base * scale) / scale, [scale])
+  const [collabOpen, setCollabOpen] = useState(false)
   let domain = ''
   try { domain = project.base_url ? new URL(project.base_url).hostname : '' } catch {}
   const pages = project.pageBreakdown || []
@@ -424,17 +439,36 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
             onError={(e) => { e.target.style.display = 'none' }}
             style={{ width: is(37, 24), height: is(37, 24), borderRadius: '50%', objectFit: 'cover', background: '#d9d9d9' }}
           />
-          <div data-nk="overlay-pill-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-            <span style={{ color: '#ddf3ec', fontSize: fs(14), fontWeight: 500, lineHeight: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>{name}</span>
-            <span style={{ color: '#ddf3ec', fontSize: fs(11), fontWeight: 500, lineHeight: '16px' }}>{timeAgo(project.lastActivityAt)}</span>
+          <div data-nk="overlay-pill-text" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, lineHeight: '36px' }}>
+            <span style={{ color: '#ddf3ec', fontSize: fs(14), fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>{name}</span>
+            <span style={{ color: '#ddf3ec', fontSize: fs(11), fontWeight: 500 }}>{timeAgo(project.lastActivityAt)}</span>
           </div>
         </div>
 
         {/* Top-right: collaborator badge + ellipsis menu */}
         <div data-nk="card-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           {project.collaboratorCount > 0 && (
-            <div data-nk="collaborator-badge" style={{ width: is(32, 24), height: is(32, 24), borderRadius: 8, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width={is(16, 16)} height={is(16, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <div
+              data-nk="collaborator-badge"
+              onMouseEnter={() => setCollabOpen(true)}
+              onMouseLeave={() => setCollabOpen(false)}
+              style={{ position: 'relative', width: 48, height: 52, borderRadius: 8, background: '#E9B454', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}
+            >
+              <svg width={is(22, 20)} height={is(22, 20)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              {collabOpen && (
+                <div style={{ position: 'absolute', top: 60, right: 0, minWidth: 220, maxWidth: 260, background: '#101715', border: '1px solid #1b2723', borderRadius: 10, padding: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 50 }}>
+                  <div style={{ padding: '6px 10px 8px', color: '#82b0a0', fontSize: fs(12), fontWeight: 600 }}>Access</div>
+                  {(project.collaborators || []).map(c => (
+                    <div key={c?.id || c?.email} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6 }}>
+                      <img src={c?.avatar_url || DEFAULT_AVATAR} alt="" style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', background: '#1b2723' }} />
+                      <span style={{ color: '#ddf3ec', fontSize: fs(13), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c?.name || c?.email || 'Collaborator'}</span>
+                    </div>
+                  ))}
+                  {(!project.collaborators || project.collaborators.length === 0) && (
+                    <div style={{ padding: '6px 10px', color: '#82b0a0', fontSize: fs(12) }}>No collaborators</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <div
@@ -447,12 +481,12 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
             </svg>
           </div>
           {menuOpen && (
-            <div data-nk="card-menu" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 38, right: 0, width: 150, background: '#101715', border: '1px solid #1b2723', borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-              <div data-nk="card-menu-share" onClick={onShare} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <div data-nk="card-menu" onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 38, right: 0, width: 240, background: '#101715', border: '1px solid #1b2723', borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              <div data-nk="card-menu-share" onClick={(e) => { e.stopPropagation(); onShare() }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = '#1b2723'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <svg width={is(15, 16)} height={is(15, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M5 12a2 2 0 1 0 0-.01M19 6a2 2 0 1 0 0-.01M19 18a2 2 0 1 0 0-.01" fill="none" stroke="#82b0a0" strokeWidth="2" /><path d="M12 11a1 1 0 0 0 .5-.87l2.5-1.5M9.5 15.4a3 3 0 1 0 3.5-5.1l2.5-1.5" fill="none" stroke="#82b0a0" strokeWidth="2" strokeLinecap="round" /></svg>
                 Share link
               </div>
-              <div data-nk="card-menu-delete" onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div data-nk="card-menu-delete" onClick={(e) => { e.stopPropagation(); onDelete() }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 6, cursor: 'pointer', color: '#f87171', fontSize: fs(13) }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <svg width={is(15, 16)} height={is(15, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 Delete project
               </div>
@@ -466,13 +500,13 @@ function ProjectCard({ project, scale, menuOpen, onMenuToggle, onShare, onDelete
         <div data-nk="card-stats" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* page count */}
           <div data-nk="page-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M14 3v5h5" /><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" /><path d="M9 14h6M9 17h6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+            <img src="/web_page_icon.svg" alt="" style={{ width: is(18, 16), height: is(18, 16) }} />
             <span style={{ color: '#ffffff', fontSize: fs(15) }}>{pageCount} {pageCount === 1 ? 'Page' : 'Pages'}</span>
           </div>
           <div style={{ width: 1, height: 18, background: '#82b0a033' }} />
           {/* nikkel count */}
           <div data-nk="nikkel-count" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: is(24, 24), height: is(24, 24), borderRadius: 12, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: is(24, 24), height: is(24, 24), borderRadius: 200, background: '#71b9a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#1b2723', fontSize: fs(14), fontWeight: 500 }}>{project.nikkelCount ?? 0}</span>
             </div>
             <span style={{ color: '#ffffff', fontSize: fs(15) }}>nikkels</span>
