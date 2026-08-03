@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="#334155" width="40" height="40" rx="20"/><text x="20" y="26" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif">?</text></svg>')
 
+// Exact proportions from the pencil `dashboard` design (frame r5tcd, 2581×1458)
+const DESIGN_W = 2581
+
 const WORDMARK = [
   { d: 'M244 66.9996C244 70.9841 240.77 74.2141 236.786 74.2141C232.801 74.2141 229.571 70.9841 229.571 66.9996V7.25649C229.571 3.27203 232.801 0.0419922 236.786 0.0419922C240.77 0.0419922 244 3.27203 244 7.25649V66.9996Z', fill: '#ffffff' },
   { d: 'M201.135 59.7378C200.606 60.3394 200.885 61.2802 201.681 61.374C202.24 61.4071 202.8 61.4236 203.36 61.4236C204.759 61.4236 206.106 61.2419 207.4 60.8786C208.694 60.5152 209.901 60.0032 211.02 59.3426C212.175 58.649 213.189 57.8232 214.063 56.8653C215.382 55.429 217.724 54.9781 219.138 56.3201L222.66 59.6624C225 61.8826 225.356 65.5721 222.93 67.6972C222.673 67.9224 222.411 68.1434 222.144 68.3602C220.43 69.7806 218.558 70.9862 216.529 71.9771C214.536 72.9681 212.419 73.7113 210.181 74.2068C207.977 74.7353 205.703 74.9995 203.36 74.9995C199.407 74.9995 195.682 74.3059 192.184 72.9185C188.721 71.5312 185.678 69.5989 183.054 67.1215C180.466 64.6442 178.419 61.7044 176.915 58.3021C175.411 54.8668 174.659 51.1013 174.659 47.0054C174.659 42.8104 175.411 38.9787 176.915 35.5104C178.419 32.0421 180.466 29.0858 183.054 26.6415C185.678 24.1971 188.721 22.2978 192.184 20.9435C195.682 19.5893 199.407 18.9121 203.36 18.9121C205.703 18.9121 207.995 19.1764 210.233 19.7049C212.472 20.2334 214.588 20.9931 216.582 21.984C218.611 22.975 220.5 24.1971 222.249 25.6505C225.273 28.1066 225.027 32.5493 222.455 35.4759L201.135 59.7378ZM206.07 34.7328C206.694 33.9512 206.349 32.7851 205.354 32.6862C204.724 32.6202 204.059 32.5871 203.36 32.5871C201.401 32.5871 199.547 32.934 197.798 33.6276C196.084 34.2883 194.58 35.2462 193.286 36.5014C192.026 37.7566 191.03 39.276 190.295 41.0597C189.56 42.8104 189.193 44.7923 189.193 47.0054C189.193 47.5008 189.211 48.0624 189.246 48.69C189.316 49.3176 189.403 49.9617 189.508 50.6223C189.648 51.2499 189.805 51.861 189.98 52.4556C190.217 53.2611 191.218 53.3445 191.742 52.6882L206.07 34.7328Z', fill: '#ffffff' },
@@ -50,9 +53,6 @@ export default function DashboardPage() {
   const [token, setToken] = useState(null)
   const [user, setUser] = useState(null)
   const [projects, setProjects] = useState([])
-  const [showNew, setShowNew] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newUrl, setNewUrl] = useState('')
   const [tab, setTab] = useState('all')
   const [sortAsc, setSortAsc] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [toast, setToast] = useState(null)
   const [unread, setUnread] = useState({})
   const [lastRefreshed, setLastRefreshed] = useState(null)
+  const [scale, setScale] = useState(1)
   const intervalRef = useRef(null)
 
   const fetchData = useCallback(async (t) => {
@@ -139,18 +140,16 @@ export default function DashboardPage() {
     pollUnread(token)
   }, [token, fetchData, pollUnread])
 
-  const createProject = useCallback(async () => {
-    if (!newTitle.trim() || !newUrl.trim()) return
-    try {
-      await api(token, '/projects', {
-        method: 'POST',
-        body: JSON.stringify({ title: newTitle, baseUrl: newUrl })
-      })
-      setNewTitle(''); setNewUrl(''); setShowNew(false)
-      const updated = await api(token, '/projects')
-      setProjects(updated)
-    } catch {}
-  }, [token, newTitle, newUrl])
+  // Scale the 2581px-wide design to fit the viewport (same approach as the review page)
+  useEffect(() => {
+    function updateScale() {
+      const fit = (window.innerWidth - 48) / DESIGN_W
+      setScale(Math.min(1, Math.max(0.4, fit)))
+    }
+    updateScale()
+    window.addEventListener('resize', updateScale)
+    return () => window.removeEventListener('resize', updateScale)
+  }, [])
 
   const deleteProject = useCallback(async (id) => {
     setDeletingId(id)
@@ -205,9 +204,11 @@ export default function DashboardPage() {
   const totalUnread = Object.values(unread).reduce((s, n) => s + (n || 0), 0)
 
   return (
-    <div style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '24px' }}>
+      <div style={{ width: DESIGN_W * scale, height: 'auto', position: 'relative', flexShrink: 0 }}>
+        <div style={{ width: DESIGN_W, position: 'absolute', top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
       {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '40px clamp(24px, 6vw, 110px) 36px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: '40px 110px 36px' }}>
         <Wordmark width={96} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -266,7 +267,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Main panel */}
-      <div style={{ margin: '0 clamp(24px, 6vw, 110px) 48px', background: '#82b0a033', borderRadius: 24, padding: '40px 36px 36px', backdropFilter: 'blur(12px)' }}>
+      <div style={{ margin: '0 110px 48px', background: '#82b0a033', borderRadius: 24, padding: '40px 36px 36px', backdropFilter: 'blur(12px)' }}>
         {/* Tabs row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 28 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -286,12 +287,6 @@ export default function DashboardPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <button
-              onClick={() => setShowNew(true)}
-              style={{ padding: '14px 22px', background: '#71b9a1', border: 'none', borderRadius: 16, color: '#1b2723', cursor: 'pointer', fontSize: 15, fontWeight: 600 }}
-            >
-              + New Project
-            </button>
-            <button
               onClick={() => setSortAsc(a => !a)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 24px', background: '#82b0a033', border: 'none', borderRadius: 16, cursor: 'pointer', color: '#ddf3ec', fontSize: 15 }}
             >
@@ -302,27 +297,6 @@ export default function DashboardPage() {
         </div>
 
         {/* New project form */}
-        {showNew && (
-          <div style={{ marginBottom: 24, padding: 16, background: '#101715', borderRadius: 16, border: '1px solid #1b2723', maxWidth: 520 }}>
-            <input
-              placeholder="Project title"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', background: '#1b2723', border: '1px solid #2a3a34', color: '#ffffff', borderRadius: 10, fontSize: 14, marginBottom: 10, boxSizing: 'border-box' }}
-            />
-            <input
-              placeholder="Site URL (https://...)"
-              value={newUrl}
-              onChange={e => setNewUrl(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', background: '#1b2723', border: '1px solid #2a3a34', color: '#ffffff', borderRadius: 10, fontSize: 14, marginBottom: 12, boxSizing: 'border-box' }}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={createProject} style={{ padding: '10px 18px', background: '#71b9a1', color: '#1b2723', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Create</button>
-              <button onClick={() => setShowNew(false)} style={{ padding: '10px 18px', background: '#1b2723', color: '#ddf3ec', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
-            </div>
-          </div>
-        )}
-
         {/* Project grid */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#82b0a0' }}>
@@ -343,11 +317,13 @@ export default function DashboardPage() {
             ))}
             {sorted.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, color: '#82b0a0', gridColumn: '1 / -1' }}>
-                <p style={{ fontSize: 15 }}>No projects here yet. Click "+ New Project" to get started.</p>
+                <p style={{ fontSize: 15 }}>No projects here yet. Start a review from the Nikkel extension.</p>
               </div>
             )}
           </div>
         )}
+      </div>
+      </div>
       </div>
 
       {/* Toast */}
