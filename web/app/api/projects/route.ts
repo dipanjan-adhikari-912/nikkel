@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const projectIds = all.map((p: any) => p.id)
   const { data: reviews } = await db
     .from('reviews')
-    .select('id, project_id')
+    .select('id, project_id, screenshot_url')
     .in('project_id', projectIds)
   const reviewIds = (reviews || []).map((r: any) => r.id)
   const reviewProjectMap: Record<string, string> = {}
@@ -58,13 +58,14 @@ export async function GET(request: NextRequest) {
     const data = projectData[p.id] || { nikkels: [] }
     const nikkelCount = data.nikkels.length
     const lastActivityAt = data.nikkels[0]?.created_at || p.created_at
+    const screenshot_url = (reviews || []).find(r => r.project_id === p.id)?.screenshot_url || null
     const pageMap: Record<string, number> = {}
     for (const n of data.nikkels) {
       const key = n.page_url || 'unknown'
       pageMap[key] = (pageMap[key] || 0) + 1
     }
     const pageBreakdown = Object.entries(pageMap).map(([pageUrl, count]) => ({ pageUrl, nikkelCount: count }))
-    return { ...p, nikkelCount, lastActivityAt, pageBreakdown }
+    return { ...p, nikkelCount, lastActivityAt, pageBreakdown, screenshot_url }
   })
 
   // Batch collaborator count in one query

@@ -337,10 +337,13 @@ function ProjectCard({ project, onCopyShare, onDelete, deleting, unreadCount }) 
     <div style={{ background: '#101014', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* Screenshot area */}
       <div style={{ position: 'relative', aspectRatio: '466 / 312', margin: 22, borderRadius: 16, background: '#1b2723', overflow: 'hidden' }}>
-        {/* screenshot placeholder */}
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: '#ffffff', fontSize: 16, fontWeight: 500 }}>[ screenshot ]</span>
-        </div>
+        {project.screenshot_url ? (
+          <img src={project.screenshot_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: '#ffffff', fontSize: 16, fontWeight: 500 }}>[ screenshot ]</span>
+          </div>
+        )}
 
         {/* Overlay pill (project + time) */}
         <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: '#1b2723cc', borderRadius: 8, backdropFilter: 'blur(3.5px)' }}>
