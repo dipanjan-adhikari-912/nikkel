@@ -635,6 +635,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         globalState.lastProject = null;
         tabState.clear();
         await saveState();
+        const allTabs = await chrome.tabs.query({}).catch(() => []);
+        for (const t of allTabs) {
+          try { chrome.tabs.sendMessage(t.id, { type: 'SIGN_OUT' }); } catch {}
+        }
         return { ok: true };
       }
 
@@ -675,6 +679,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         setLastProject(project, review);
         await saveState();
         try {
+          // Claim collaborator seat so the project shows up on the dashboard
+          if (!isOwner) await ensureCollaborator(project.id);
           const nikkels = await supabaseClient.request(`/rest/v1/nikkels?review_id=eq.${review.id}&order=idx.asc`, { token: globalState.token });
           stateForTab.nikkels = nikkels;
           await sendToTab(tab.id, {

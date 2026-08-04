@@ -51,6 +51,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
   const { data, error } = await db.rpc('delete_project', { pid: params.id, uid: auth.user.id })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (data?.error) return NextResponse.json({ error: data.error }, { status: 404 })
+  if (data?.error) {
+    // Not the owner — just remove this user's access so the project leaves their dashboard
+    const { error: leaveError } = await db.rpc('leave_project', { pid: params.id, uid: auth.user.id })
+    if (leaveError) return NextResponse.json({ error: leaveError.message }, { status: 500 })
+    return NextResponse.json({ message: 'Removed from your view' })
+  }
   return NextResponse.json({ message: 'Project deleted' })
 }

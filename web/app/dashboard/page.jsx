@@ -96,6 +96,17 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
+    function handler(event) {
+      if (event.data?.source === 'nikkel-extension' && event.data?.type === 'NIKKEL_SIGNED_OUT') {
+        setToken(null)
+        try { sessionStorage.removeItem('nikkel_token') } catch {}
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  useEffect(() => {
     const t = getToken()
     if (t) { setToken(t); return }
 
@@ -173,10 +184,10 @@ export default function DashboardPage() {
   const deleteProject = useCallback(async (id) => {
     setDeletingId(id)
     try {
-      await api(token, `/projects/${id}`, { method: 'DELETE' })
+      const res = await api(token, `/projects/${id}`, { method: 'DELETE' })
       setProjects(prev => prev.filter(p => p.id !== id))
       setUnread(prev => { const next = { ...prev }; delete next[id]; return next })
-      setToast('Project deleted')
+      setToast(res?.message || 'Project deleted')
     } catch {
       setToast('Failed to delete project')
     } finally {
@@ -320,7 +331,7 @@ export default function DashboardPage() {
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 24px', background: '#82b0a033', border: 'none', borderRadius: 16, cursor: 'pointer', color: '#ddf3ec', fontSize: fs(15) }}
             >
               <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M3 6h11M3 12h7M3 18h4M17 4v16M17 20l4-4M17 4l4 4" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform={sortAsc ? 'scale(1,-1) translate(0,-24)' : undefined} /></svg>
-              <span>Sort by date</span>
+              <span>{sortAsc ? 'Oldest first' : 'Latest first'}</span>
             </button>
           </div>
         </div>
@@ -363,35 +374,41 @@ export default function DashboardPage() {
       )}
 
       {/* Delete confirmation dialog */}
-      {confirmDelete && (
-        <div
-          data-nk="delete-dialog"
-          onClick={() => setConfirmDelete(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
-        >
-          <div onClick={e => e.stopPropagation()} style={{ width: 420, maxWidth: '100%', background: '#101014', border: '1px solid #1b2723', borderRadius: 16, padding: 28 }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 600, color: '#ffffff' }}>Delete project?</h3>
-            <p style={{ margin: 0, fontSize: 14, color: '#82b0a0', lineHeight: 1.5 }}>
-              This will permanently delete the project and all its feedback. This action cannot be undone.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-              <button
-                onClick={() => setConfirmDelete(null)}
-                style={{ padding: '9px 16px', background: '#1b2723', color: '#ddf3ec', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { const id = confirmDelete; setConfirmDelete(null); deleteProject(id) }}
-                disabled={deletingId === confirmDelete}
-                style={{ padding: '9px 16px', background: deletingId === confirmDelete ? '#7f1d1d' : '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: deletingId === confirmDelete ? 'wait' : 'pointer', fontSize: 14, fontWeight: 500 }}
-              >
-                {deletingId === confirmDelete ? 'Deleting...' : 'Delete project'}
-              </button>
+      {confirmDelete && (() => {
+        const target = projects.find(p => p.id === confirmDelete)
+        const isOwner = target?.role === 'owner'
+        return (
+          <div
+            data-nk="delete-dialog"
+            onClick={() => setConfirmDelete(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
+          >
+            <div onClick={e => e.stopPropagation()} style={{ width: 420, maxWidth: '100%', background: '#101014', border: '1px solid #1b2723', borderRadius: 16, padding: 28 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 600, color: '#ffffff' }}>Delete project?</h3>
+              <p style={{ margin: 0, fontSize: 14, color: '#82b0a0', lineHeight: 1.5 }}>
+                {isOwner
+                  ? 'This will permanently delete the project and all its feedback. This action cannot be undone.'
+                  : 'This will only remove the project from your view. The project and your comments will remain intact for the owner.'}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  style={{ padding: '9px 16px', background: '#1b2723', color: '#ddf3ec', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { const id = confirmDelete; setConfirmDelete(null); deleteProject(id) }}
+                  disabled={deletingId === confirmDelete}
+                  style={{ padding: '9px 16px', background: deletingId === confirmDelete ? '#7f1d1d' : '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: deletingId === confirmDelete ? 'wait' : 'pointer', fontSize: 14, fontWeight: 500 }}
+                >
+                  {deletingId === confirmDelete ? (isOwner ? 'Deleting...' : 'Removing...') : (isOwner ? 'Delete project' : 'Remove from view')}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

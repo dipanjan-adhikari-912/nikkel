@@ -301,6 +301,18 @@ begin
 end;
 $$;
 
+-- RPC: remove a collaborator from a project without deleting it (used when a non-owner "deletes" from their dashboard)
+create or replace function leave_project(pid uuid, uid uuid)
+returns jsonb
+language plpgsql
+security definer
+as $$
+begin
+  delete from project_collaborators where project_id = pid and user_id = uid;
+  return jsonb_build_object('message', 'Removed from your view');
+end;
+$$;
+
 -- RPC: delete a project and all children in one transaction (avoid slow multi-round-trip deletes)
 create or replace function delete_project(pid uuid, uid uuid)
 returns jsonb

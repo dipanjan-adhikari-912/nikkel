@@ -2104,6 +2104,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         removeBar();
         return { ok: true };
       }
+      case 'SIGN_OUT': {
+        delete document.documentElement.dataset.nikkelToken;
+        try { sessionStorage.removeItem('nikkel_token') } catch {}
+        window.postMessage({ type: 'NIKKEL_SIGNED_OUT', source: 'nikkel-extension' }, '*');
+        return { ok: true };
+      }
       case 'PIN_CONFIRMED': {
         addPin(msg.payload.nikkel);
         return { ok: true };
