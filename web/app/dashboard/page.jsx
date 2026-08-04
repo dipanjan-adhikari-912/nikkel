@@ -182,6 +182,18 @@ export default function DashboardPage() {
     return () => document.removeEventListener('click', onClick)
   }, [menuOpen])
 
+  // Close the activity panel when clicking outside it
+  useEffect(() => {
+    if (!activityOpen) return
+    function onClick(e) {
+      if (!e.target?.closest?.('[data-nk="activity-dropdown"]')) {
+        setActivityOpen(false)
+      }
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [activityOpen])
+
   const deleteProject = useCallback(async (id) => {
     setDeletingId(id)
     try {
