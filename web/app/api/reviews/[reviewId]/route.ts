@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/server/supabase'
+import { userDb } from '@/lib/server/supabase'
 import { requireAuth } from '@/lib/server/auth'
 
 export async function POST(request: NextRequest, { params }: { params: { reviewId: string } }) {
@@ -11,7 +11,8 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
     return NextResponse.json({ error: 'newOwnerId is required' }, { status: 400 })
   }
 
-  const { data: review, error: findError } = await db
+  const sdb = userDb(auth.token)
+  const { data: review, error: findError } = await sdb
     .from('reviews')
     .select('owner_id')
     .eq('id', params.reviewId)
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
     return NextResponse.json({ error: 'You do not own this review' }, { status: 403 })
   }
 
-  const { error: updateError } = await db
+  const { error: updateError } = await sdb
     .from('reviews')
     .update({ owner_id: newOwnerId })
     .eq('id', params.reviewId)

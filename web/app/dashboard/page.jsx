@@ -65,6 +65,7 @@ export default function DashboardPage() {
   const [lastRefreshed, setLastRefreshed] = useState(null)
   const [now, setNow] = useState(Date.now())
   const [scale, setScale] = useState(1)
+  const [dismissed, setDismissed] = useState(() => { try { return JSON.parse(sessionStorage.getItem('nikkel_dismissed') || '[]') } catch { return [] } })
   const intervalRef = useRef(null)
 
   const fetchData = useCallback(async (t) => {
@@ -237,6 +238,18 @@ export default function DashboardPage() {
     { key: 'shared', label: 'Shared with you' },
   ]
   const totalUnread = Object.values(unread).reduce((s, n) => s + (n || 0), 0)
+  const dismissItem = useCallback((id) => {
+    setDismissed(prev => {
+      const next = [...new Set([...prev, id])]
+      try { sessionStorage.setItem('nikkel_dismissed', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+  const clearAll = useCallback(() => {
+    setDismissed([])
+    try { sessionStorage.removeItem('nikkel_dismissed') } catch {}
+  }, [])
+  const activityList = sorted.filter(p => !dismissed.includes(p.id))
 
   return (
     <div data-nk="page-bg" style={{ minHeight: '100vh', backgroundImage: 'url(/review_bg.png)', backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center', color: '#ffffff', fontFamily: '"Instrument Sans", system-ui, sans-serif', display: 'flex', justifyContent: 'center', overflowX: 'hidden', padding: '24px' }}>
@@ -248,14 +261,12 @@ export default function DashboardPage() {
 
         <div data-nk="top-bar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Refresh chip */}
-          <div data-nk="refresh-chip" style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#82b0a033', borderRadius: 12, padding: '12px 16px', height: 76, boxSizing: 'border-box' }}>
-            <button data-nk="refresh-button" onClick={refresh} style={{ width: 24, height: 24, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Refresh">
-              <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
+          <button data-nk="refresh-chip" onClick={refresh} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#82b0a033', borderRadius: 12, padding: '12px 16px', height: 76, boxSizing: 'border-box', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }} aria-label="Refresh">
+            <svg width={is(18, 16)} height={is(18, 16)} viewBox="0 0 24 24" style={{ display: 'block', flexShrink: 0 }}><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span data-nk="last-refreshed" style={{ color: '#ddf3ec', fontSize: fs(16), whiteSpace: 'nowrap' }}>
               Last refreshed on: {lastRefreshed ? timeAgo(lastRefreshed.toISOString(), now) : 'Just now'}
             </span>
-          </div>
+          </button>
 
           {/* Activity dropdown */}
           <div data-nk="activity-dropdown" style={{ position: 'relative' }}>
@@ -272,14 +283,25 @@ export default function DashboardPage() {
               <svg width={is(12, 12)} height={is(12, 12)} viewBox="0 0 24 24" style={{ display: 'block', transform: activityOpen ? 'rotate(180deg)' : 'none' }}><path d="M6 9l6 6 6-6" fill="none" stroke="#ddf3ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
             {activityOpen && (
-              <div data-nk="activity-panel" style={{ position: 'absolute', top: 56, right: 0, width: 300, background: '#101715', border: '1px solid #1b2723', borderRadius: 12, padding: 8, boxShadow: '0 12px 32px rgba(0,0,0,0.5)', zIndex: 50 }}>
-                {sorted.length === 0 && <div style={{ padding: '16px 12px', color: '#82b0a0', fontSize: fs(14) }}>No projects yet.</div>}
-                {sorted.map(p => (
-                  <div key={p.id} data-nk="activity-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8 }}>
-                    <span style={{ color: '#ddf3ec', fontSize: fs(14), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || p.base_url}</span>
-                    <span style={{ color: '#82b0a0', fontSize: fs(12), flexShrink: 0 }}>{timeAgo(p.lastActivityAt)}</span>
-                  </div>
-                ))}
+              <div data-nk="activity-panel" style={{ position: 'absolute', top: 56, right: 0, width: 300, background: '#101715', border: '1px solid #1b2723', borderRadius: 12, padding: 16, boxShadow: '0 12px 32px rgba(0,0,0,0.5)', zIndex: 50, boxSizing: 'border-box' }}>
+                {activityList.length === 0 ? (
+                  <div style={{ padding: '16px 12px', color: '#82b0a0', fontSize: fs(14) }}>No projects yet.</div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                      <button data-nk="activity-clear-all" onClick={clearAll} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#82b0a0', fontSize: fs(12), padding: 0, fontFamily: 'inherit' }}>Clear all</button>
+                    </div>
+                    {activityList.map(p => (
+                      <div key={p.id} data-nk="activity-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 8, minWidth: 0 }}>
+                        <span style={{ color: '#ddf3ec', fontSize: fs(14), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{p.title || p.base_url}</span>
+                        <span style={{ color: '#82b0a0', fontSize: fs(12), flexShrink: 0 }}>{timeAgo(p.lastActivityAt)}</span>
+                        <button data-nk="activity-dismiss" onClick={() => dismissItem(p.id)} aria-label={`Dismiss ${p.title || p.base_url}`} style={{ width: 20, height: 20, background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg width={is(12, 12)} height={is(12, 12)} viewBox="0 0 24 24" style={{ display: 'block' }}><path d="M18 6 6 18M6 6l12 12" fill="none" stroke="#82b0a0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/server/supabase'
+import { userDb } from '@/lib/server/supabase'
 import { requireAuth } from '@/lib/server/auth'
 
 export async function GET(request: NextRequest, { params }: { params: { reviewId: string } }) {
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
-  const { data, error } = await db
+  const { data, error } = await userDb(auth.token)
     .from('nikkels')
     .select('*, replies(*)')
     .eq('review_id', params.reviewId)
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
-  const { data: review } = await db
+  const sdb = userDb(auth.token)
+  const { data: review } = await sdb
     .from('reviews')
     .select('project_id')
     .eq('id', params.reviewId)
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
 
   if (!review) return NextResponse.json({ error: 'Review not found' }, { status: 404 })
 
-  const { data: project } = await db
+  const { data: project } = await sdb
     .from('projects')
     .select('owner_id')
     .eq('id', review.project_id)
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
   const isOwner = project?.owner_id === auth.user.id
   let isCollaborator = false
   if (!isOwner) {
-    const { data: collab } = await db
+    const { data: collab } = await sdb
       .from('project_collaborators')
       .select('user_id')
       .eq('project_id', review.project_id)
@@ -55,12 +56,12 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
     return NextResponse.json({ error: 'pageUrl and commentText are required' }, { status: 400 })
   }
 
-  const { count } = await db
+  const { count } = await sdb
     .from('nikkels')
     .select('id', { count: 'exact', head: true })
     .eq('review_id', params.reviewId)
 
-  const { data, error } = await db
+  const { data, error } = await sdb
     .from('nikkels')
     .insert({
       review_id: params.reviewId,
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: { reviewI
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   try {
-    await db.rpc('pg_notify', {
+    await sdb.rpc('pg_notify', {
       channel: 'nikkel_created',
       payload: JSON.stringify({ nikkelId: data.id })
     })

@@ -122,10 +122,13 @@ function showSignIn() {
 $('signinGoogleBtn').addEventListener('click', async () => {
   $('signinGoogleBtn').style.pointerEvents = 'none';
   $('signinGoogleBtn').style.opacity = '.7';
+  const spin = document.querySelector('#signinGoogleBtn .spin');
+  if (spin) spin.style.display = 'inline-block';
   const tab = await getActiveTab();
   const res = await bg({ type: 'SIGN_IN_GOOGLE', payload: { tabId: tab?.id } });
   $('signinGoogleBtn').style.pointerEvents = '';
   $('signinGoogleBtn').style.opacity = '';
+  if (spin) spin.style.display = 'none';
   if (res.ok) { init(); }
   else { showError(res.error || 'Sign-in failed.'); }
 });
@@ -143,7 +146,11 @@ function showReady(state) {
 
   $('vauthStartBtn').onclick = async () => {
     $('vauthStartBtn').disabled = true;
-    $('vauthStartBtn').textContent = 'Starting…';
+    const startSpin = document.createElement('span');
+    startSpin.className = 'spin';
+    startSpin.style.display = 'inline-block';
+    startSpin.style.marginRight = '6px';
+    $('vauthStartBtn').prepend(startSpin);
     const tab = await getActiveTab();
     if (!tab) { showError('No active tab found.'); $('vauthStartBtn').disabled = false; $('vauthStartBtn').textContent = 'Start Review'; return; }
     const res = await bg({ type: 'START_REVIEW', payload: { tabId: tab.id, title: tab.title, url: tab.url } });
@@ -192,7 +199,11 @@ function showActiveView(state) {
 
   $('reviewShareBtn').onclick = async () => {
     $('reviewShareBtn').disabled = true;
-    $('reviewShareBtn').textContent = 'Generating…';
+    const shareSpin = document.createElement('span');
+    shareSpin.className = 'spin';
+    shareSpin.style.display = 'inline-block';
+    shareSpin.style.marginRight = '6px';
+    $('reviewShareBtn').prepend(shareSpin);
     const tab = await getActiveTab();
     const res = await bg({ type: 'SHARE', payload: { tabId: tab?.id } });
     if (res.ok && res.shareUrl) {

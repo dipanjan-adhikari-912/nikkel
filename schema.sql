@@ -252,29 +252,34 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 
-create or replace function get_unread_counts(uid uuid)
+create or replace function get_unread_counts()
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
+  uid uuid := auth.uid();
   result jsonb;
 begin
+  if uid is null then
+    return jsonb_build_object('total', 0, 'byProject', '{}'::jsonb);
+  end if;
   with project_ids as (
-    select id from projects where owner_id = uid
+    select id from public.projects where owner_id = uid
     union
-    select project_id from project_collaborators where user_id = uid
+    select project_id from public.project_collaborators where user_id = uid
   ),
   read_states as (
     select project_id, last_read_at
-    from project_read_state
+    from public.project_read_state
     where user_id = uid
   ),
   unread_events as (
     -- New nikkels since last read (includes own)
     select p.id as pid from project_ids p
-    join reviews rv on rv.project_id = p.id
-    join nikkels n on n.review_id = rv.id
+    join public.reviews rv on rv.project_id = p.id
+    join public.nikkels n on n.review_id = rv.id
     left join read_states rs on rs.project_id = p.id
     where rs.last_read_at is null or n.created_at > rs.last_read_at
 
@@ -282,9 +287,9 @@ begin
 
     -- New replies since last read (includes own)
     select p.id as pid from project_ids p
-    join reviews rv on rv.project_id = p.id
-    join nikkels n on n.review_id = rv.id
-    join replies r on r.nikkel_id = n.id
+    join public.reviews rv on rv.project_id = p.id
+    join public.nikkels n on n.review_id = rv.id
+    join public.replies r on r.nikkel_id = n.id
     left join read_states rs on rs.project_id = p.id
     where rs.last_read_at is null or r.created_at > rs.last_read_at
   )
@@ -301,43 +306,54 @@ begin
 end;
 $$;
 
--- RPC: remove a collaborator from a project without deleting it (used when a non-owner "deletes" from their dashboard)
-create or replace function leave_project(pid uuid, uid uuid)
+-- RPC: remove the calling user from a project without deleting it (used when a non-owner "deletes" from their dashboard)
+create or replace function leave_project(pid uuid)
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
+declare
+  uid uuid := auth.uid();
 begin
-  delete from project_collaborators where project_id = pid and user_id = uid;
+  if uid is null then
+    return jsonb_build_object('error', 'Not authenticated');
+  end if;
+  delete from public.project_collaborators where project_id = pid and user_id = uid;
   return jsonb_build_object('message', 'Removed from your view');
 end;
 $$;
 
 -- RPC: delete a project and all children in one transaction (avoid slow multi-round-trip deletes)
-create or replace function delete_project(pid uuid, uid uuid)
+create or replace function delete_project(pid uuid)
 returns jsonb
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
+  uid uuid := auth.uid();
   _review_ids uuid[];
   _nikkel_ids uuid[];
 begin
-  if not exists (select 1 from projects where id = pid and owner_id = uid) then
+  if uid is null then
+    return jsonb_build_object('error', 'Not authenticated');
+  end if;
+  if not exists (select 1 from public.projects where id = pid and owner_id = uid) then
     return jsonb_build_object('error', 'Not found or not authorized');
   end if;
   -- Bulk delete bottom-up (much faster than relying on ON DELETE CASCADE triggers)
-  select array_agg(id) into _review_ids from reviews where project_id = pid;
+  select array_agg(id) into _review_ids from public.reviews where project_id = pid;
   if _review_ids is not null then
-    select array_agg(id) into _nikkel_ids from nikkels where review_id = any(_review_ids);
+    select array_agg(id) into _nikkel_ids from public.nikkels where review_id = any(_review_ids);
     if _nikkel_ids is not null then
-      delete from replies where nikkel_id = any(_nikkel_ids);
+      delete from public.replies where nikkel_id = any(_nikkel_ids);
     end if;
-    delete from nikkels where review_id = any(_review_ids);
-    delete from reviews where project_id = pid;
+    delete from public.nikkels where review_id = any(_review_ids);
+    delete from public.reviews where project_id = pid;
   end if;
-  delete from project_collaborators where project_id = pid;
-  delete from projects where id = pid;
+  delete from public.project_collaborators where project_id = pid;
+  delete from public.projects where id = pid;
   return jsonb_build_object('message', 'Project deleted');
 end;
 $$;

@@ -13,6 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
       .from('reviews')
       .select('*, projects(*)')
       .eq('share_token', params.shareToken)
+      .eq('visibility', 'public')
       .single()
 
     const targetReview = (reviewError || !review) ? null : review
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: { shareTok
         .from('reviews')
         .select('*, projects(*)')
         .eq('project_id', project.id)
+        .eq('visibility', 'public')
         .limit(1)
         .single()
 

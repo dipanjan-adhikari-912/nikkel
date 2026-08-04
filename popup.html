@@ -18,6 +18,8 @@
     .btn-outline:hover { background: #1e293b; color: #e2e8f0; }
     .btn-sm { padding: 6px 12px; font-size: 12px; }
     .btn-google, .btn-github { display: none; }
+    .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .link { color: #6366f1; cursor: pointer; font-size: 12px; }
     .link:hover { text-decoration: underline; }
     .sep { height: 1px; background: #1e293b; margin: 12px 0; }
@@ -45,8 +47,7 @@
     /* Sign-in prompt */
     #vAuth { background: #101715; padding: 48px 28px; }
     #vAuth.view.active { display: flex; flex-direction: column; align-items: center; gap: 28px; }
-    .signin-logo { width: 90px; height: 90px; background: #fff; border-radius: 4px; flex-shrink: 0; }
-    .signin-title { font-family: 'Josefin Sans', system-ui, sans-serif; font-size: 24px; font-weight: 600; color: #ddf3ec; text-align: center; letter-spacing: -0.48px; }
+    .signin-logo { width: 164px; height: auto; flex-shrink: 0; }
     .signin-desc { font-family: 'Inter', system-ui, sans-serif; font-size: 15px; line-height: 22px; text-align: center; background: linear-gradient(#82b0a0, #82b0a0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .signin-google-btn { background: #71b9a1; color: #101715; border: none; border-radius: 14px; padding: 14px 20px; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 16px; font-weight: 500; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .signin-google-btn:hover { background: #7fc4ac; }
@@ -120,12 +121,12 @@
   </div>
 
   <div id="vAuth" class="view">
-    <div class="signin-logo"></div>
-    <div class="signin-title">Welcome to nikkel</div>
+    <img class="signin-logo" src="logo_wordmark-topdown.svg" alt="nikkel" />
     <div class="signin-desc">Sign-in with your Google Account to begin reviewing</div>
     <div class="signin-google-btn" id="signinGoogleBtn">
+      <span class="spin" style="display:none"></span>
       <svg width="28" height="28" viewBox="-5.96e-8 0 19.6 20" fill="none"><path d="M1.0640007 5.5100002C1.8963751 3.8535349 3.1728225 2.461056 4.7507997 1.4880643C6.3287768 0.51507264 8.1461601 -0.00012648696 10.000001 2.3293406e-08C12.695001 2.3293405e-08 14.959001 0.99100006 16.690001 2.605L13.823001 5.473C12.786001 4.4819999 11.468001 3.9770002 10.000001 3.9770002C7.3950009 3.9770002 5.190001 5.7370005 4.4050012 8.1000004C4.2050014 8.7000008 4.091001 9.3400002 4.091001 10C4.091001 10.66 4.2050014 11.299999 4.4050012 11.9C5.1910009 14.264 7.3950009 16.023001 10.000001 16.023001C11.345001 16.023001 12.490001 15.668001 13.386001 15.068001C13.905438 14.726003 14.350132 14.282226 14.693202 13.763495C15.036272 13.244765 15.270594 12.661855 15.382001 12.05L10.000001 12.05L10.000001 8.1820002L19.417999 8.1820002C19.535999 8.8360004 19.6 9.5180006 19.6 10.227C19.6 13.273001 18.51 15.837 16.618 17.577C14.964 19.105 12.700001 20 10.000001 20C8.6866341 20.000526 7.3860378 19.742228 6.1725445 19.239866C4.9590511 18.737505 3.8564508 18.000931 2.9277604 17.072241C1.9990699 16.143551 1.2624955 15.04095 0.76013476 13.827456C0.25777394 12.613963 -0.00052486139 11.313367 8.0071436e-07 10C8.0071436e-07 8.3859997 0.38600075 6.8600001 1.0640007 5.5100002Z" fill="#101715"/></svg>
-      Sign in with Google
+      <span id="signinGoogleLabel">Sign in with Google</span>
     </div>
     <div class="vauth-signout" id="vauthPowerOff">
       <span class="vauth-signout-text">Power off</span>

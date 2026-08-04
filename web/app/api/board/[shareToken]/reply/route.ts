@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/server/supabase'
+import { userDb } from '@/lib/server/supabase'
 import { requireAuth } from '@/lib/server/auth'
+import { rateLimit } from '@/lib/server/rate-limit'
 
 export async function POST(request: NextRequest, { params }: { params: { shareToken: string } }) {
+  const limited = rateLimit(request, { key: 'board-reply', limit: 20, windowMs: 60_000 })
+  if (limited) return limited
+
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
@@ -16,7 +20,8 @@ export async function POST(request: NextRequest, { params }: { params: { shareTo
       return NextResponse.json({ error: 'nikkelId and text are required' }, { status: 400 })
     }
 
-    const { data: review, error: reviewError } = await db
+    const sdb = userDb(auth.token)
+    const { data: review, error: reviewError } = await sdb
       .from('reviews')
       .select('id, project_id')
       .eq('share_token', params.shareToken)
@@ -26,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { shareTo
       return NextResponse.json({ error: 'Board not found' }, { status: 404 })
     }
 
-    const { data: nikkel, error: nikkelError } = await db
+    const { data: nikkel, error: nikkelError } = await sdb
       .from('nikkels')
       .select('id, review_id')
       .eq('id', nikkelId)
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { shareTo
       return NextResponse.json({ error: 'Nikkel not found in this review' }, { status: 404 })
     }
 
-    const { data: project } = await db
+    const { data: project } = await sdb
       .from('projects')
       .select('owner_id')
       .eq('id', review.project_id)
@@ -44,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: { shareTo
 
     const isOwner = project?.owner_id === auth.user.id
     if (!isOwner) {
-      await db
+      await sdb
         .from('project_collaborators')
         .upsert(
           { project_id: review.project_id, user_id: auth.user.id, role: 'collaborator' },
@@ -52,7 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: { shareTo
         )
     }
 
-    const { data, error } = await db
+    const { data, error } = await sdb
       .from('replies')
       .insert({
         nikkel_id: nikkelId,

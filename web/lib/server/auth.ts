@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server'
 import { db } from './supabase'
 
-// Lightweight auth: decode JWT locally, skip Supabase Auth API round-trip.
-// The JWT was already verified by Supabase client before being sent to us.
-function decodeToken(token: string): Record<string, any> | null {
+const SUPABASE_URL = process.env.SUPABASE_URL || ''
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || ''
+
+// Verify the JWT against Supabase Auth instead of trusting an unverified base64 decode.
+// The /auth/v1/user endpoint rejects expired, tampered, or forged tokens.
+async function verifyToken(token: string): Promise<Record<string, any> | null> {
   try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString())
-    if (decoded.exp && decoded.exp * 1000 < Date.now()) return null
-    return decoded
-  } catch { return null }
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }
 
 function extractBearer(request: Request) {
@@ -23,28 +31,29 @@ export async function requireAuth(request: Request) {
   const token = extractBearer(request)
   if (!token) return { error: NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 }) }
 
-  const payload = decodeToken(token)
-  if (!payload) return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) }
-
-  if (!payload.sub) return { error: NextResponse.json({ error: 'Invalid token payload' }, { status: 401 }) }
+  const user = await verifyToken(token)
+  if (!user?.id) return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) }
 
   const { data: profile } = await db
     .from('profiles')
     .select('*')
-    .eq('id', payload.sub)
+    .eq('id', user.id)
     .single()
 
-  return { user: { id: payload.sub, email: payload.email || '', is_anonymous: !!payload.is_anonymous }, profile }
+  return {
+    token,
+    user: { id: user.id, email: user.email || '', is_anonymous: !!user.app_metadata?.is_anonymous },
+    profile,
+  }
 }
 
-// Even lighter: just verify token, skip profile fetch entirely
+// Even lighter: just verify the token, skip profile fetch entirely
 export async function requireAuthOnly(request: Request) {
   const token = extractBearer(request)
   if (!token) return { error: NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 }) }
 
-  const payload = decodeToken(token)
-  if (!payload) return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) }
-  if (!payload.sub) return { error: NextResponse.json({ error: 'Invalid token payload' }, { status: 401 }) }
+  const user = await verifyToken(token)
+  if (!user?.id) return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) }
 
-  return { user: { id: payload.sub, email: payload.email || '', is_anonymous: !!payload.is_anonymous } }
+  return { token, user: { id: user.id, email: user.email || '', is_anonymous: !!user.app_metadata?.is_anonymous } }
 }

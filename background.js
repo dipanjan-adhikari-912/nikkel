@@ -150,7 +150,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     ts.barActive = true;
     await sendToTab(activeInfo.tabId, {
       type: 'ACTIVATE',
-      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+      payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: ts.mode, readOnly: ts.readOnly, userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
     });
   }
 });
@@ -176,7 +176,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
         await saveState();
         await sendToTab(tabId, {
           type: 'ACTIVATE',
-          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId, shareUrl: '', mode: 'annotate', readOnly: false, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+          payload: { projectName: globalState.lastProject.title, sessionId: globalState.lastProject.projectId, reviewId, shareUrl: '', mode: 'annotate', readOnly: false, userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
         });
       }
     } else if (ts.project && globalState.token) {
@@ -191,8 +191,17 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
           await saveState();
           await sendToTab(tabId, {
             type: 'ACTIVATE',
-            payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: 'annotate', readOnly: false, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: ts.project.title, sessionId: ts.project.id, reviewId: ts.review?.id, shareUrl: '', mode: 'annotate', readOnly: false, userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
+        } else {
+          // New website = new session. Drop the previous project so pins restart at 1.
+          ts.project = null;
+          ts.review = null;
+          ts.nikkels = [];
+          ts.mode = 'idle';
+          ts.barActive = false;
+          await saveState();
+          await sendToTab(tabId, { type: 'DEACTIVATE' }).catch(() => {});
         }
       } catch {}
     }
@@ -214,7 +223,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     switch (msg.type) {
       case 'GET_STATE': {
         const token = globalState.token || '';
-        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', userAvatarUrl: globalState.user?.avatarUrl || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(token)}`, nikkelCount: ts?.nikkels?.length || 0 };
+        return { ok: true, user: globalState.user, userName: globalState.user?.name || '', userEmail: globalState.user?.email || '', userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', mode: ts?.mode || 'idle', project: ts?.project || null, review: ts?.review || null, globalDisabled: globalState.globalDisabled, url: ts?.url || '', title: ts?.title || '', readOnly: ts?.readOnly || false, token, dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(token)}`, nikkelCount: ts?.nikkels?.length || 0 };
       }
 
       case 'START_REVIEW': {
@@ -243,7 +252,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tId) {
           await sendToTab(tId, {
             type: 'ACTIVATE',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review?.id, shareUrl: '', userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         }
         return { ok: true, project, review };
@@ -281,7 +290,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         } catch {
           tab.project = null; tab.review = null; tab.nikkels = []; tab.mode = 'idle'; tab.barActive = false;
           await saveState();
-          try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
+          try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }).catch(() => {}); } catch {}
           return { ok: false, error: 'Project has been deleted. Starting a new review.' };
         }
         const d = msg.payload.nikkel;
@@ -320,7 +329,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!srcTabId) return { ok: true, nikkels: [] };
         const tab = getTabState(srcTabId);
         if (!tab.project || !tab.review) {
-          try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }); } catch {}
+          try { chrome.tabs.sendMessage(srcTabId, { type: 'DEACTIVATE' }).catch(() => {}); } catch {}
           return { ok: true, nikkels: [] };
         }
         const allPages = msg.payload?.allPages;
@@ -558,7 +567,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (tab.project) {
             await sendToTab(tId, {
               type: 'ACTIVATE',
-              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+              payload: { projectName: tab.project.title, sessionId: tab.project.id, reviewId: tab.review?.id, shareUrl: '', mode: tab.mode, readOnly: tab.readOnly, userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
             });
           }
         }
@@ -608,7 +617,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             for (const [id, t] of tabState) {
               if (id !== srcTabId && t.mode === 'annotate') {
                 t.mode = 'idle'; t.barActive = false;
-                try { chrome.tabs.sendMessage(id, { type: 'DEACTIVATE' }); } catch {}
+                try { chrome.tabs.sendMessage(id, { type: 'DEACTIVATE' }).catch(() => {}); } catch {}
               }
             }
           }
@@ -622,8 +631,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'TOGGLE_DISABLED': {
         globalState.globalDisabled = msg.payload?.disabled;
         pendingShare = null;
-        for (const [id] of tabState) {
-          try { chrome.tabs.sendMessage(id, { type: 'DEACTIVATE' }); } catch {}
+        const allTabs = await chrome.tabs.query({}).catch(() => []);
+        for (const t of allTabs) {
+          chrome.tabs.sendMessage(t.id, { type: 'DEACTIVATE' }).catch(() => {});
         }
         tabState.clear();
         await saveState();
@@ -637,7 +647,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await saveState();
         const allTabs = await chrome.tabs.query({}).catch(() => []);
         for (const t of allTabs) {
-          try { chrome.tabs.sendMessage(t.id, { type: 'SIGN_OUT' }); } catch {}
+          try { chrome.tabs.sendMessage(t.id, { type: 'SIGN_OUT' }).catch(() => {}); } catch {}
         }
         return { ok: true };
       }
@@ -685,7 +695,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           stateForTab.nikkels = nikkels;
           await sendToTab(tab.id, {
             type: 'LOAD_SESSION',
-            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: stateForTab.readOnly, nikkels, userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
+            payload: { projectName: project.title, sessionId: project.id, reviewId: review.id, shareUrl: '', viewOnly: stateForTab.readOnly, nikkels, userId: globalState.user?.id || '', userAvatarUrl: globalState.user?.avatarUrl || '', userName: globalState.user?.name || '', dashboardUrl: `${VIEWER_BASE}/dashboard#token=${encodeURIComponent(globalState.token || '')}` },
           });
         } catch {}
         return { ok: true, targetUrl, reused };
@@ -722,19 +732,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!screenshotUrl) {
           try {
             const srcTab = await chrome.tabs.get(srcTabId);
-            if (srcTab?.windowId) {
+            if (srcTab?.windowId && !srcTab.url.startsWith('chrome://')) {
+              try { await chrome.windows.update(srcTab.windowId, { focused: true }); } catch {}
+              try { await chrome.tabs.update(srcTabId, { active: true }); } catch {}
               const HIDE_CSS = '[id^="nikkel-"] { display: none !important; }';
               let injected = false;
               try {
                 await chrome.scripting.insertCSS({ target: { tabId: srcTabId }, css: HIDE_CSS });
                 injected = true;
-                await new Promise(r => setTimeout(r, 150));
+                await new Promise(r => setTimeout(r, 250));
               } catch {}
-              screenshotUrl = await chrome.tabs.captureVisibleTab(srcTab.windowId, { format: 'jpeg', quality: 55 });
+              for (let attempt = 0; attempt < 3 && !screenshotUrl; attempt++) {
+                try {
+                  screenshotUrl = await chrome.tabs.captureVisibleTab(srcTab.windowId, { format: 'jpeg', quality: 55 });
+                  break;
+                } catch {
+                  if (attempt < 2) await new Promise(r => setTimeout(r, 400));
+                }
+              }
               if (injected) {
                 try { await chrome.scripting.removeCSS({ target: { tabId: srcTabId }, css: HIDE_CSS }); } catch {}
               }
-              await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, { method: 'PATCH', token: globalState.token, body: JSON.stringify({ screenshot_url: screenshotUrl }) });
+              if (screenshotUrl) {
+                await supabaseClient.request(`/rest/v1/reviews?id=eq.${review.id}`, { method: 'PATCH', token: globalState.token, body: JSON.stringify({ screenshot_url: screenshotUrl }) });
+              }
             }
           } catch (e) {
             console.warn('[BG] SHARE: screenshot capture failed:', e.message);

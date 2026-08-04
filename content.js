@@ -332,7 +332,7 @@ const BAR_HTML = `
     </div>
 
     <span class="bar-brand" id="projectName"></span>
-    <span class="bar-brand">nikkel</span>
+    <img class="bar-brand" id="brandWordmark" width="72" height="22" style="display:block" />
 
     <div class="pill pill-mode">
       <div class="flex items-center gap-1.5" style="display:flex;align-items:center;gap:6px">
@@ -360,11 +360,11 @@ const BAR_HTML = `
     </div>
 
     <button class="pill pill-filled" id="eyeBtn" aria-label="Toggle nikkels visibility">
-      <svg class="eye-visible" width="16" height="16" viewBox="0 0 44 44" fill="none" stroke="url(#logoGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="eye-visible" width="16" height="16" viewBox="0 0 44 44" fill="none" stroke="url(#logoGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <path d="M22.0002 9.16675C10.4373 9.16675 4.82733 19.5856 3.83183 21.6481C3.77862 21.7578 3.75098 21.8781 3.75098 22.0001C3.75098 22.122 3.77862 22.2424 3.83183 22.3521C4.8255 24.4146 10.4355 34.8334 22.0002 34.8334C33.5648 34.8334 39.173 24.4146 40.1685 22.3521C40.2217 22.2424 40.2493 22.122 40.2493 22.0001C40.2493 21.8781 40.2217 21.7578 40.1685 21.6481C39.1748 19.5856 33.5648 9.16675 22.0002 9.16675Z"/>
         <path d="M22 27.5C25.0376 27.5 27.5 25.0376 27.5 22C27.5 18.9624 25.0376 16.5 22 16.5C18.9624 16.5 16.5 18.9624 16.5 22C16.5 25.0376 18.9624 27.5 22 27.5Z"/>
       </svg>
-      <svg class="eye-hidden" width="16" height="16" viewBox="0 0 44 44" fill="none" stroke="url(#logoGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="eye-hidden" width="16" height="16" viewBox="0 0 44 44" fill="none" stroke="url(#logoGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12.8334 11.6637C15.606 10.0154 18.7746 9.15228 22.0001 9.16667C33.5629 9.16667 39.1729 19.5855 40.1684 21.648C40.2784 21.8735 40.2784 22.1265 40.1684 22.3538C39.5231 23.6885 36.9491 28.5175 32.0834 31.7607M25.6667 34.4667C24.4599 34.7117 23.2315 34.8346 22.0001 34.8333C10.4372 34.8333 4.82724 24.4145 3.83174 22.352C3.77796 22.2418 3.75 22.1208 3.75 21.9982C3.75 21.8755 3.77796 21.7545 3.83174 21.6443C4.23324 20.8157 5.37174 18.6523 7.33341 16.3552M18.3334 17.9007C19.3812 16.964 20.7479 16.464 22.1528 16.5033C23.5577 16.5426 24.8942 17.1183 25.888 18.1121C26.8818 19.1059 27.4574 20.4424 27.4967 21.8473C27.5361 23.2522 27.0361 24.6188 26.0994 25.6667M5.50008 5.5L38.5001 38.5"/>
       </svg>
       <span id="eyeBtnText" style="color:#ffffffcc;font-size:14px">Hide nikkels</span>
@@ -761,7 +761,7 @@ let commentResolve = null;
 let currentSessionId = null;
 let currentReviewId = null;
 let currentDashboardUrl = '';
-let currentUser = { avatarUrl: '', name: '' };
+let currentUser = { avatarUrl: '', name: '', id: '' };
 let readOnly = false;
 let currentPageIdx = 0;
 let pollInterval = null;
@@ -1019,6 +1019,8 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
   setMode(initialMode || 'browse');
 
   if (projectNameEl) projectNameEl.textContent = projectName || '';
+  const wordmark = qs(shadow, 'brandWordmark');
+  if (wordmark) wordmark.src = chrome.runtime.getURL('Wordmark.svg');
   if (dashboardLink && dashboardUrl) { dashboardLink.href = dashboardUrl; }
   if (dashboardLink) {
     dashboardLink.addEventListener('click', (e) => {
@@ -1108,13 +1110,13 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
         list.innerHTML = nikkels.map(n => {
           const x = n.x ?? 0;
           const y = n.y ?? 0;
-          const text = n.element_text ? `"${n.element_text.slice(0, 60)}"` : '';
-          const comment = n.comment ? n.comment.slice(0, 80) : '';
+          const text = n.element_text ? `"${escHtml(n.element_text.slice(0, 60))}"` : '';
+          const comment = n.comment ? escHtml(n.comment.slice(0, 80)) : '';
           return `<div class="pdItem" data-x="${x}" data-y="${y}" data-page-url="${escHtml(n.page_url || '')}">
-            <span class="pdIdx">${n.idx || '?'}</span>
+            <span class="pdIdx">${escHtml(String(n.idx ?? '?'))}</span>
             <div class="pdBody">
-              <span class="pdPage">${pageLabel(n.page_url)}</span>
-              <div class="pdMeta">${n.tag ? `<strong>&lt;${n.tag}&gt;</strong> ` : ''}${text}</div>
+              <span class="pdPage">${escHtml(pageLabel(n.page_url))}</span>
+              <div class="pdMeta">${n.tag ? `<strong>&lt;${escHtml(n.tag)}&gt;</strong> ` : ''}${text}</div>
               ${comment ? `<div class="pdComment">${comment}</div>` : ''}
             </div>
           </div>`;
@@ -1206,8 +1208,19 @@ function injectBar(projectName, sessionId, shareUrl, initialMode, reviewId, isRe
       if (shareUrlSection) shareUrlSection.style.display = 'none';
       if (shareMeta) shareMeta.textContent = '';
 
+      const shareSpin = document.createElement('span');
+      shareSpin.className = 'nv-spinner';
+      shareSpin.style.display = 'inline-block';
+      shareBtn.style.pointerEvents = 'none';
+      shareBtnText.textContent = '';
+      shareBtn.prepend(shareSpin);
+
       let shareRes;
       try { shareRes = await chrome.runtime.sendMessage({ type: 'SHARE' }); } catch { shareRes = null; }
+
+      if (shareSpin && shareSpin.parentNode) shareSpin.remove();
+      shareBtn.style.pointerEvents = '';
+      if (shareBtnText) shareBtnText.textContent = 'Share';
 
       if (shareRes?.ok && shareRes.shareUrl) {
         if (shareUrlSection) shareUrlSection.style.display = '';
@@ -1724,7 +1737,7 @@ function addPin(nikkel) {
   renderPinContent(pin, nikkel);
   const px = (nikkel.x ?? nikkel.pageX ?? 0) - 13;
   const py = (nikkel.y ?? nikkel.pageY ?? 0) - 13;
-  const pc = pinColor(nikkel.owner_id || nikkel.userId);
+  const pc = (nikkel.owner_id && currentUser.id && nikkel.owner_id === currentUser.id) ? '#06b6d4' : pinColor(nikkel.owner_id || nikkel.userId);
   pin.style.cssText = `
     position: absolute;
     left: ${px}px;
@@ -2095,7 +2108,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     console.log('[Nikkel] received message', msg.type);
     switch (msg.type) {
       case 'ACTIVATE': {
-        currentUser = { avatarUrl: msg.payload.userAvatarUrl || '', name: msg.payload.userName || '' };
+        currentUser = { avatarUrl: msg.payload.userAvatarUrl || '', name: msg.payload.userName || '', id: msg.payload.userId || '' };
         injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.mode || 'annotate', msg.payload.reviewId, msg.payload.readOnly, msg.payload.dashboardUrl);
         loadPinsForReview();
         return { ok: true };
@@ -2118,7 +2131,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true, url: location.href, title: document.title };
       }
       case 'LOAD_SESSION': {
-        currentUser = { avatarUrl: msg.payload.userAvatarUrl || '', name: msg.payload.userName || '' };
+        currentUser = { avatarUrl: msg.payload.userAvatarUrl || '', name: msg.payload.userName || '', id: msg.payload.userId || '' };
         injectBar(msg.payload.projectName, msg.payload.sessionId, msg.payload.shareUrl, msg.payload.viewOnly ? 'browse' : 'annotate', msg.payload.reviewId, msg.payload.viewOnly, msg.payload.dashboardUrl);
         removeAllPins();
         for (const n of msg.payload.nikkels) {
@@ -2182,6 +2195,7 @@ function resumeActiveReview(retries = 5) {
     chrome.runtime.sendMessage({ type: 'GET_STATE' }, (res) => {
       if (chrome.runtime.lastError) return;
       if (res?.ok && res.project) {
+        currentUser = { avatarUrl: res.userAvatarUrl || '', name: res.userName || '', id: res.userId || '' };
         if (!barHost) injectBar(res.project.title, res.project.id, null, res.mode || 'annotate', res.review?.id, res.readOnly, res.dashboardUrl);
         onPageReady(loadPinsForReview);
       } else if (retries > 0) {

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   if (reviewIds.length > 0) {
     const { data: n } = await db
       .from('nikkels')
-      .select('created_at, page_url, review_id')
+      .select('created_at, page_url, screenshot_url, review_id')
       .in('review_id', reviewIds)
       .order('created_at', { ascending: false })
     allNikkels = n || []
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     const data = projectData[p.id] || { nikkels: [] }
     const nikkelCount = data.nikkels.length
     const lastActivityAt = data.nikkels[0]?.created_at || p.created_at
-    const screenshot_url = (reviews || []).find(r => r.project_id === p.id)?.screenshot_url || null
+    const screenshot_url = (reviews || []).find(r => r.project_id === p.id)?.screenshot_url || data.nikkels[0]?.screenshot_url || null
     const pageMap: Record<string, number> = {}
     for (const n of data.nikkels) {
       const key = n.page_url || 'unknown'

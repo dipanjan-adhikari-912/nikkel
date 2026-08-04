@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/server/supabase'
+import { userDb } from '@/lib/server/supabase'
 import { requireAuth } from '@/lib/server/auth'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireAuth(request)
   if ('error' in auth) return auth.error
 
-  const { data, error } = await db
+  const { data, error } = await userDb(auth.token)
     .from('replies')
     .select('*')
     .eq('nikkel_id', params.id)
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'authorName and text are required' }, { status: 400 })
   }
 
-  const { data, error } = await db
+  const { data, error } = await userDb(auth.token)
     .from('replies')
     .insert({ nikkel_id: params.id, author_name: authorName, author_email: authorEmail, body, is_client: false })
     .select()
