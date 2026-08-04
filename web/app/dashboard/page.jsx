@@ -201,8 +201,8 @@ export default function DashboardPage() {
       setProjects(prev => prev.filter(p => p.id !== id))
       setUnread(prev => { const next = { ...prev }; delete next[id]; return next })
       setToast(res?.message || 'Project deleted')
-    } catch {
-      setToast('Failed to delete project')
+    } catch (e) {
+      setToast(e?.message || 'Failed to delete project')
     } finally {
       setDeletingId(null)
     }
