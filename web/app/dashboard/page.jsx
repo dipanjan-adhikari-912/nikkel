@@ -204,6 +204,17 @@ export default function DashboardPage() {
 
   const fs = useCallback((base) => base / scale, [scale])
   const is = useCallback((base, min) => Math.max(min, base * scale) / scale, [scale])
+  const dismissItem = useCallback((id) => {
+    setDismissed(prev => {
+      const next = [...new Set([...prev, id])]
+      try { sessionStorage.setItem('nikkel_dismissed', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+  const clearAll = useCallback(() => {
+    setDismissed([])
+    try { sessionStorage.removeItem('nikkel_dismissed') } catch {}
+  }, [])
 
   function copyShareLink(shareToken) {
     navigator.clipboard.writeText(`${window.location.origin}/review/${shareToken}`)
@@ -238,17 +249,6 @@ export default function DashboardPage() {
     { key: 'shared', label: 'Shared with you' },
   ]
   const totalUnread = Object.values(unread).reduce((s, n) => s + (n || 0), 0)
-  const dismissItem = useCallback((id) => {
-    setDismissed(prev => {
-      const next = [...new Set([...prev, id])]
-      try { sessionStorage.setItem('nikkel_dismissed', JSON.stringify(next)) } catch {}
-      return next
-    })
-  }, [])
-  const clearAll = useCallback(() => {
-    setDismissed([])
-    try { sessionStorage.removeItem('nikkel_dismissed') } catch {}
-  }, [])
   const activityList = sorted.filter(p => !dismissed.includes(p.id))
 
   return (
