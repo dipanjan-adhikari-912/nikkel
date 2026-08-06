@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useExtensionInstalled } from '@/hooks/use-extension-installed'
+import ChromeWebStoreLink from '@/components/ChromeWebStoreLink'
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect fill="#334155" width="40" height="40" rx="20"/><text x="20" y="26" text-anchor="middle" fill="#94a3b8" font-size="18" font-family="sans-serif">?</text></svg>')
 
@@ -67,6 +69,7 @@ export default function DashboardPage() {
   const [scale, setScale] = useState(1)
   const [dismissed, setDismissed] = useState(() => { try { return JSON.parse(sessionStorage.getItem('nikkel_dismissed') || '[]') } catch { return [] } })
   const intervalRef = useRef(null)
+  const { status: extStatus, recheck } = useExtensionInstalled()
 
   const fetchData = useCallback(async (t) => {
     if (!t) return
@@ -111,22 +114,31 @@ export default function DashboardPage() {
     const t = getToken()
     if (t) { setToken(t); return }
 
+    // Keep listening for the token indefinitely (no 5s teardown) so a user who installs the
+    // extension while this tab is open is signed into the dashboard automatically — no refresh.
+    function found(tok) {
+      setToken(tok)
+      try { sessionStorage.setItem('nikkel_token', tok) } catch {}
+      stop()
+    }
+
     function handler(event) {
-      if (event.data?.source === 'nikkel-extension' && event.data?.token) {
-        setToken(event.data.token)
-        try { sessionStorage.setItem('nikkel_token', event.data.token) } catch {}
-      }
+      if (event.data?.source === 'nikkel-extension' && event.data?.token) found(event.data.token)
     }
     window.addEventListener('message', handler)
 
     const interval = setInterval(() => {
       const dt = document.documentElement.dataset.nikkelToken
-      if (dt) { setToken(dt); try { sessionStorage.setItem('nikkel_token', dt) } catch {}; clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
+      if (dt) found(dt)
     }, 300)
 
     window.postMessage({ type: 'NIKKEL_PING' }, '*')
-    const timer = setTimeout(() => { clearInterval(interval); window.removeEventListener('message', handler) }, 5000)
-    return () => { clearInterval(interval); clearTimeout(timer); window.removeEventListener('message', handler) }
+
+    function stop() {
+      clearInterval(interval)
+      window.removeEventListener('message', handler)
+    }
+    return () => { clearInterval(interval); window.removeEventListener('message', handler) }
   }, [])
 
   useEffect(() => {
@@ -236,8 +248,40 @@ export default function DashboardPage() {
 
   if (!token) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#101715', color: '#ddf3ec', fontFamily: '"Instrument Sans", system-ui, sans-serif' }}>
-        <p>Sign in via the Nikkel extension to access the dashboard.</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24, background: '#101715', color: '#ddf3ec', fontFamily: '"Instrument Sans", system-ui, sans-serif' }}>
+        <div style={{ maxWidth: 460, width: '100%', textAlign: 'center' }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em' }}>
+            Install Nikkel to continue
+          </h1>
+          <p style={{ margin: '10px 0 0', color: '#82b0a0', fontSize: 15, lineHeight: 1.55 }}>
+            Nikkel works through a Chrome extension. Install it to access your dashboard and start reviewing websites.
+          </p>
+
+          <div aria-live="polite" style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+            {extStatus === 'installed' ? (
+              <span style={{ color: '#71b9a1', fontSize: 15 }}>Extension detected&mdash;signing you in&hellip;</span>
+            ) : (
+              <ChromeWebStoreLink
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#6366f1', color: '#ffffff', fontSize: 15, fontWeight: 600, borderRadius: 10, height: 46, padding: '0 28px', textDecoration: 'none', boxShadow: '0 8px 24px rgba(99,102,241,0.25)' }}
+              >
+                Add to Chrome
+              </ChromeWebStoreLink>
+            )}
+
+            {extStatus !== 'installed' && (
+              <button
+                onClick={recheck}
+                style={{ background: 'transparent', border: '1px solid #1e293b', color: '#ddf3ec', fontSize: 14, fontWeight: 500, borderRadius: 10, height: 42, padding: '0 20px', cursor: 'pointer' }}
+              >
+                {extStatus === 'checking' ? 'Checking&hellip;' : 'Check Again'}
+              </button>
+            )}
+          </div>
+
+          {extStatus === 'checking' && (
+            <p aria-hidden="true" style={{ marginTop: 12, color: '#82b0a0', fontSize: 13 }}>Detecting extension&hellip;</p>
+          )}
+        </div>
       </div>
     )
   }

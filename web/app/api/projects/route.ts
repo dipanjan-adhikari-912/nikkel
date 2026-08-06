@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/server/supabase'
+import { db, userDb } from '@/lib/server/supabase'
 import { requireAuth } from '@/lib/server/auth'
+import { canCreateProject, effectivePlan } from '@/lib/plan-limits'
+
+const ENFORCE_PLANS = process.env.NIKKEL_ENFORCE_PLANS === 'true'
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request)
@@ -107,6 +110,32 @@ export async function POST(request: NextRequest) {
   const { title, baseUrl } = await request.json()
   if (!title || !baseUrl) {
     return NextResponse.json({ error: 'title and baseUrl are required' }, { status: 400 })
+  }
+
+  // Pricing gate. Off by default (free-for-all launch); enabled via NIKKEL_ENFORCE_PLANS=true.
+  if (ENFORCE_PLANS) {
+    const [subResult, countResult] = await Promise.all([
+      userDb(auth.token)
+        .from('subscriptions')
+        .select('plan, subscription_status')
+        .eq('user_id', auth.user.id)
+        .maybeSingle(),
+      userDb(auth.token)
+        .from('projects')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', auth.user.id),
+    ])
+
+    if (countResult.error) return NextResponse.json({ error: countResult.error.message }, { status: 500 })
+
+    const sub = subResult.data
+    const plan = effectivePlan(sub?.plan ?? 'free', sub?.subscription_status ?? null)
+    if (!canCreateProject(plan, countResult.count ?? 0)) {
+      return NextResponse.json(
+        { error: 'Free plan allows 1 project. Upgrade to Pro or Team for unlimited projects.' },
+        { status: 403 }
+      )
+    }
   }
 
   const { data, error } = await db

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import ChromeWebStoreLink from '@/components/ChromeWebStoreLink'
 
 const SEVERITY = {
   low: { label: 'Low Priority', bars: 1 },
@@ -363,15 +364,14 @@ export default function ReviewPage({ params }) {
                     <svg width="16" height="16" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>
                 ) : (
-                  <a
-                    href="/download"
+                  <ChromeWebStoreLink
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: '#71b9a1', borderRadius: 19.4, height: 47.6, textDecoration: 'none', padding: '0 16px' }}
                   >
                     <span style={{ color: '#1b2723', fontSize: 16, fontWeight: 500 }}>
                       {extensionState === false ? 'Install Nikkel' : 'Review Feedback'}
                     </span>
                     <svg width="16" height="16" viewBox="0 0 14 14" style={{ flexShrink: 0 }}><path d="M0 7h14M7 0l7 7-7 7" fill="none" stroke="#1b2723" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </a>
+                  </ChromeWebStoreLink>
                 )}
 
                 <div style={{ color: '#dcf2ebff', fontSize: 17, textAlign: 'center', lineHeight: 1.4 }}>
