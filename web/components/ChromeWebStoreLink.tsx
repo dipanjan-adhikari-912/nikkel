@@ -17,6 +17,8 @@ interface ChromeWebStoreLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorEl
 
 export default function ChromeWebStoreLink({ children, style, className, ...rest }: ChromeWebStoreLinkProps) {
   if (!STORE_URL) {
+    // Production: no install path configured yet — don't show a dead disabled button.
+    if (!IS_DEV) return null
     return (
       <span style={{ display: 'inline-block' }}>
         <span
@@ -27,11 +29,9 @@ export default function ChromeWebStoreLink({ children, style, className, ...rest
         >
           {children ?? 'Add to Chrome'}
         </span>
-        {IS_DEV && (
-          <span role="alert" style={{ display: 'block', fontSize: 12, marginTop: 6, color: '#f59e0b' }}>
-            NEXT_PUBLIC_CHROME_WEB_STORE_URL is not set.
-          </span>
-        )}
+        <span role="alert" style={{ display: 'block', fontSize: 12, marginTop: 6, color: '#f59e0b' }}>
+          NEXT_PUBLIC_CHROME_WEB_STORE_URL is not set.
+        </span>
       </span>
     )
   }
