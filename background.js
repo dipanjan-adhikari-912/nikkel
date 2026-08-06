@@ -732,7 +732,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!screenshotUrl) {
           try {
             const srcTab = await chrome.tabs.get(srcTabId);
-            if (srcTab?.windowId && !srcTab.url.startsWith('chrome://')) {
+            if (srcTab?.windowId && srcTab.url && !srcTab.url.startsWith('chrome://')) {
               try { await chrome.windows.update(srcTab.windowId, { focused: true }); } catch {}
               try { await chrome.tabs.update(srcTabId, { active: true }); } catch {}
               const HIDE_CSS = '[id^="nikkel-"] { display: none !important; }';

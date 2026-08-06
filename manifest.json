@@ -4,13 +4,14 @@
   "version": "0.1.0",
   
   "description": "Drop annotation pins on any webpage. Share sessions with your team.",
-  "permissions": ["activeTab", "storage", "scripting", "tabs", "clipboardWrite", "identity"],
+  "permissions": ["activeTab", "storage", "scripting", "clipboardWrite", "identity"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
