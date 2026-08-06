@@ -13,10 +13,19 @@ function isValid() {
 }
 
 function bgMsg(msg, cb) {
-  if (!isValid()) { console.warn('[Nikkel] context invalid, skipping', msg.type); return; }
+  if (!isValid()) { handleDeadContext(); return; }
   try {
     if (cb) { chrome.runtime.sendMessage(msg, cb); } else { chrome.runtime.sendMessage(msg); }
   } catch (e) { console.warn('[Nikkel] sendMessage failed', msg.type, e.message); }
+}
+
+function handleDeadContext() {
+  if (window.__nikkelContextDead) return;
+  window.__nikkelContextDead = true;
+  window.__nikkelLoaded = false;
+  stopPolling();
+  removeBar();
+  console.warn('[Nikkel] extension context invalidated — Nikkel UI removed. Reload the page to resume.');
 }
 
 const BAR_HTML = `
